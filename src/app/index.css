@@ -1,0 +1,1101 @@
+@import './../assets/fonts/fonts.css';
+@import "tailwindcss";
+
+/* ===========================================================================
+   Design tokens — ported verbatim from cx-portal's canonical :root sheet
+   (khouryai/cx-portal styles.css, see its DESIGN_TOKENS.md), by way of P6-KPI.
+   adjusted here: the two applications are meant to look like one product, so
+   this sheet is a copy, not a variation. Only tokens this app has no use for
+   (Test Register skin slots, PDF markup colors) are left out.
+
+   Rules of engagement, same as there:
+   - New colors go through tokens, not raw hex.
+   - This is the only bare :root block. Do not open another.
+   - There is no dark mode, by decision.
+   =========================================================================== */
+:root {
+  /* ── Brand — Hitachi red ── */
+  --hitachi-red: #e60012;
+  --hitachi-red-hover: #b80010;
+  --hitachi-red-light: #fff1f2;
+  --primary: #e60012;
+  --primary-hover: #b80010;
+  /* ── Warm neutral ink scale ── */
+  --black: #0a0a0c;
+  --near-black: #131316;
+  --charcoal: #1d1e22;
+  --gray-900: #2a2c31;
+  --gray-800: #3a3c43;
+  --gray-700: #54575f;
+  --gray-600: #74777f;
+  --gray-500: #9a9da4;
+  --gray-400: #c2c5cb;
+  --gray-300: #dfe1e5;
+  --gray-200: #ececef;
+  --gray-100: #f4f4f6;
+  --gray-50: #fafaf8;
+  --white: #ffffff;
+  /* ── Slate (cool gray) — dark chrome only ── */
+  --slate-900: #111827;
+  --slate-800: #1f2937;
+  --slate-700: #374151;
+  --slate-600: #4b5563;
+  --slate-500: #6b7280;
+  --slate-300: #d1d5db;
+  --slate-200: #e5e7eb;
+  --slate-100: #f3f4f6;
+  --slate-50: #f9fafb;
+  --dark-surface: #111827;
+  --dark-surface-2: #172033;
+  --dark-surface-3: #1f2937;
+  /* ── Semantic surfaces / text / borders ── */
+  --bg: #f4f4f4;
+  --app-bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --surface-3: #f3f4f6;
+  --card-bg: #ffffff;
+  --text: #1a1a1a;
+  --text-main: #131316;
+  --text-muted: #6e7179;
+  --text-subtle: #697280;
+  --border: #ebebeb;
+  --border-strong: #d8d8d8;
+  --line-soft: #e4e7ec;
+  --line-strong: #cfd5df;
+  /* ── Status ── */
+  --good: #0d7a4f;
+  --good-light: #e8f4ee;
+  --warn: #a8550a;
+  --warn-light: #fbf0e1;
+  --bad: #c01017;
+  --bad-light: #fdeaeb;
+  --info: #1d4eaf;
+  --info-light: #e8efff;
+  --good-border: rgba(13, 122, 79, 0.28);
+  --warn-border: rgba(168, 85, 10, 0.30);
+  --bad-border: rgba(192, 16, 23, 0.26);
+  --info-border: rgba(29, 78, 175, 0.26);
+  --accent-purple: #6d28d9;
+  --accent-purple-light: #f1eaf9;
+  --pending: #6b21a8;
+  --pending-light: #f1eaf9;
+  --red-600: #c01017;
+  --red-300: #fca5a5;
+  /* ── Status mid-dots ── */
+  --good-dot: #16a571;
+  --warn-dot: #e0900b;
+  --bad-dot: #e51b22;
+  --info-dot: #3a76e8;
+  --pending-dot: #9333d9;
+  /* ── Accents ── */
+  --accent-blue: #2563eb;
+  --accent-blue-strong: #1d4ed8;
+  --brand-blue: #1d4eaf;
+  --accent-indigo: #6366f1;
+  --accent-amber: #f59e0b;
+  --green-700: #15803d;
+  /* ── Typography ── */
+  --f-display: 'Archivo', system-ui, -apple-system, sans-serif;
+  --f-ui: 'Archivo', system-ui, -apple-system, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --f-input: var(--f-ui);
+  --f-number: var(--f-ui);
+  --input-size: 14px;
+  --input-weight: 500;
+  --number-size: 28px;
+  --number-weight: 600;
+  /* ── Elevation / shape / motion ── */
+  --shadow-sm: 0 1px 2px rgba(15, 17, 21, 0.05), 0 1px 1px rgba(15, 17, 21, 0.03);
+  --shadow-md: 0 1px 2px rgba(15, 17, 21, 0.04), 0 6px 16px -8px rgba(15, 17, 21, 0.14);
+  --shadow-lg: 0 2px 6px rgba(15, 17, 21, 0.06), 0 28px 56px -20px rgba(15, 17, 21, 0.30);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --easing: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --ring: 0 0 0 3px rgba(230, 0, 18, 0.10);
+  /* ── Spacing ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  /* ── Focus ring — the one visible focus style ── */
+  --focus-ring: 2px solid rgba(230, 0, 18, 0.35);
+  --focus-ring-offset: 2px;
+}
+
+/* Expose the tokens to Tailwind utilities so `text-muted`, `bg-surface-2`,
+   `border-line-soft` and friends resolve to the same values as var(--…). */
+@theme inline {
+  --color-brand: var(--hitachi-red);
+  --color-brand-hover: var(--hitachi-red-hover);
+  --color-ink: var(--text);
+  --color-ink-main: var(--text-main);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-app: var(--app-bg);
+  --color-line: var(--border);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+  --color-good: var(--good);
+  --color-good-light: var(--good-light);
+  --color-warn: var(--warn);
+  --color-warn-light: var(--warn-light);
+  --color-bad: var(--bad);
+  --color-bad-light: var(--bad-light);
+  --color-info: var(--info);
+  --color-info-light: var(--info-light);
+  --font-sans: var(--f-ui);
+  --font-mono: var(--f-mono);
+  --radius-card: var(--radius-lg);
+}
+
+/* ===========================================================================
+   Base
+   =========================================================================== */
+* { border-color: var(--border); }
+
+html { color-scheme: light; }
+
+body {
+  margin: 0;
+  font-family: var(--f-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+::selection { background: rgba(230, 0, 18, 0.14); }
+
+/* A mono uppercase micro-label. The single most recognisable mark of this
+   design language: it carries every eyebrow, KPI label and table header. */
+.eyebrow {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+/* ===========================================================================
+   Side navigation — near-black chrome with a red brand wash
+   =========================================================================== */
+.sidenav {
+  background:
+    radial-gradient(800px 400px at -20% -20%, rgba(230, 0, 18, 0.10), transparent 60%),
+    linear-gradient(180deg, #0c0c0f 0%, var(--black) 100%);
+  color: var(--white);
+}
+
+.sidenav-brand {
+  padding: 22px 18px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.sidenav-brand-name {
+  font-family: var(--f-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--white);
+  line-height: 1.1;
+}
+.sidenav-brand-sub {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.sidenav-links { padding: 6px 12px; }
+
+.sidenav-section-label {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.32);
+  padding: 14px 12px 4px;
+}
+
+.nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 7px 12px;
+  border-radius: 7px;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--easing), background var(--dur-fast) var(--easing);
+}
+.nav-link:hover { color: var(--white); background: rgba(255, 255, 255, 0.04); }
+.nav-link.active { color: var(--white); background: rgba(255, 255, 255, 0.06); }
+/* The red rail that marks the current screen. */
+.nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--hitachi-red);
+  box-shadow: 0 0 14px var(--hitachi-red);
+}
+
+.sidenav-foot {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 16px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.nav-count {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 1px 6px;
+  background: var(--hitachi-red);
+  color: var(--white);
+}
+
+/* ===========================================================================
+   Page hero — eyebrow, title, sub, and an optional chip-stat rail
+   =========================================================================== */
+.page-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: 18px 28px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-soft);
+}
+.ph-eyebrow {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 3px;
+}
+.ph-title {
+  font-family: var(--f-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text);
+  margin: 0;
+}
+.ph-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.35;
+  max-width: 105ch;
+}
+.ph-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Chip-stat: mono micro-label plus a tabular number in a tinted pill. */
+.ph-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  line-height: 1;
+}
+.ph-stat-lbl {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+.ph-stat-val {
+  font-family: var(--f-number);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ph-stat.tone-red { background: var(--bad-light); border-color: transparent; }
+.ph-stat.tone-amber { background: var(--warn-light); border-color: transparent; }
+.ph-stat.tone-blue { background: var(--info-light); border-color: transparent; }
+.ph-stat.tone-good { background: var(--good-light); border-color: transparent; }
+.ph-stat.tone-red .ph-stat-val { color: var(--bad); }
+.ph-stat.tone-amber .ph-stat-val { color: var(--warn); }
+.ph-stat.tone-blue .ph-stat-val { color: var(--info); }
+.ph-stat.tone-good .ph-stat-val { color: var(--good); }
+.ph-stat.tone-muted .ph-stat-val { color: var(--text-subtle); }
+.ph-stat.tone-red .ph-stat-lbl { color: var(--bad); opacity: 0.72; }
+.ph-stat.tone-amber .ph-stat-lbl { color: var(--warn); opacity: 0.72; }
+.ph-stat.tone-blue .ph-stat-lbl { color: var(--info); opacity: 0.72; }
+.ph-stat.tone-good .ph-stat-lbl { color: var(--good); opacity: 0.72; }
+
+/* ===========================================================================
+   Cards and KPI cards
+   =========================================================================== */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+}
+
+.card-title {
+  font-family: var(--f-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0;
+}
+
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px;
+  transition: transform var(--dur) var(--easing), border-color var(--dur) var(--easing), box-shadow var(--dur) var(--easing);
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-md);
+}
+.kpi-label {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+.kpi-value {
+  font-family: var(--f-number);
+  font-size: 42px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 8px;
+}
+.kpi-value.tone-good { color: var(--good); }
+.kpi-value.tone-warn { color: var(--warn); }
+.kpi-value.tone-bad { color: var(--bad); }
+/* A tone as a plain text colour, limited to inline elements so it never reaches
+   into the components that style their own tones. */
+b.tone-good, span.tone-good { color: var(--good); }
+b.tone-warn, span.tone-warn { color: var(--warn); }
+b.tone-bad, span.tone-bad { color: var(--bad); }
+b.tone-muted, span.tone-muted { color: var(--text-muted); }
+
+.kpi-sub { font-size: 12px; color: var(--text-muted); }
+.kpi-sub strong { color: var(--text); font-weight: 600; }
+
+/* The one highlighted card in a row, as on the cx-portal dashboard. */
+.kpi-card.kpi-primary {
+  background: linear-gradient(180deg, var(--white) 0%, #fffafa 100%);
+  border-color: rgba(230, 0, 18, 0.18);
+  box-shadow: var(--shadow-md);
+}
+.kpi-card.kpi-primary .kpi-value { color: var(--text-main); }
+
+/* ===========================================================================
+   Buttons — one interaction grammar: 8px radius, fast transition, 1px press.
+   Solid Hitachi red is the primary action; bordered surface is everything else.
+   =========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 8px 13px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--easing), border-color var(--dur-fast) var(--easing),
+    color var(--dur-fast) var(--easing), transform var(--dur-fast) var(--easing), box-shadow var(--dur-fast) var(--easing);
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-strong); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  color: var(--white);
+  background: var(--hitachi-red);
+  border-color: var(--hitachi-red);
+  padding: 9px 14px;
+  box-shadow: 0 1px 2px rgba(230, 0, 18, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.btn-primary:hover:not(:disabled) { background: var(--hitachi-red-hover); border-color: var(--hitachi-red-hover); }
+
+.btn-danger {
+  color: var(--white);
+  background: var(--bad);
+  border-color: var(--bad);
+  box-shadow: 0 1px 2px rgba(192, 16, 23, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.btn-danger:hover:not(:disabled) { background: #9c0d13; border-color: #9c0d13; }
+
+.btn-mini {
+  font-size: 11.5px;
+  padding: 4px 9px;
+  gap: 4px;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+/* .btn-mini deliberately mutes its text, and it is declared AFTER .btn-primary at the
+   same specificity — so a small primary button came out muted grey on the red fill,
+   which is where the selected "Whole project" chip lost its contrast. The filled
+   variants have to say it again, and later, to get their white text back. */
+.btn-mini.btn-primary,
+.btn-mini.btn-danger { color: var(--white); }
+
+/* A plain text link-button, for inline row actions. */
+.btn-link {
+  font-family: var(--f-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-blue);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-link:hover:not(:disabled) { color: var(--accent-blue-strong); }
+.btn-link.danger { color: var(--bad); }
+/* A link button that is doing something has to look like it, or a slow write reads
+   as a dead control and gets clicked again. */
+.btn-link:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ===========================================================================
+   Form controls
+   =========================================================================== */
+.input,
+.cell-input {
+  font-family: var(--f-input);
+  font-size: var(--input-size);
+  font-weight: var(--input-weight);
+  color: var(--text);
+  background: var(--white);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 7px 11px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  transition: border-color var(--dur-fast) var(--easing), box-shadow var(--dur-fast) var(--easing);
+}
+.input:focus,
+.cell-input:focus {
+  outline: none;
+  border-color: rgba(230, 0, 18, 0.45);
+  box-shadow: var(--ring);
+}
+.input::placeholder,
+.cell-input::placeholder { color: var(--text-subtle); opacity: 0.7; }
+
+select.input,
+select.cell-input {
+  font-size: 12.5px;
+  border-radius: 7px;
+  padding: 8px 26px 8px 11px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23777' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+
+/* Inside a table the control has to disappear until touched, or the grid reads
+   as a form. Same focus treatment, no resting chrome. */
+.cell-input {
+  width: 100%;
+  font-size: 12.5px;
+  padding: 3px 6px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.cell-input:hover { border-color: var(--border-strong); background: var(--white); }
+.cell-input:focus { background: var(--white); }
+select.cell-input { padding: 3px 22px 3px 6px; }
+/* An answer given for a neighbouring period, still standing for this one. It is a
+   real answer, so it is not greyed out; it is somebody else's fortnight's words, so
+   it does not read as flatly as one written here. The dotted underline is what says
+   so without colour, for the same reason the outcome tiles carry their own words. */
+.cell-input.is-carried {
+  font-style: italic;
+  color: var(--text-muted);
+  text-decoration: underline dotted var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+/* Controls inside a table must not collapse to the width of their arrow. */
+.tbl td .cell-input { min-width: 48px; }
+/* A code column carries a word, not a number: give it room for "Unassigned". */
+.tbl td .cell-input.cell-wide { min-width: 96px; }
+.tbl td select.cell-input { min-width: 92px; }
+.tbl td input[type='date'].cell-input { min-width: 120px; }
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.form-hint { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+/* ===========================================================================
+   Tables
+   =========================================================================== */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tbl th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: left;
+  white-space: nowrap;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 10px 14px;
+}
+.tbl th:hover { color: var(--text); }
+.tbl td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: top;
+  white-space: nowrap;
+  color: var(--text);
+}
+.tbl tbody tr:hover td { background: var(--surface-2); }
+.tbl tbody tr:last-child td { border-bottom: 0; }
+
+/* A cell given an explicit width has to keep it: with `table-layout: auto` a long
+   word would otherwise push the column back out and undo the drag. Hiding the
+   overflow is also what makes "fit columns" measurable — `scrollWidth` on a clipped
+   cell is exactly the width its content is asking for. */
+.tbl th, .tbl td { overflow: hidden; text-overflow: ellipsis; }
+
+/* The measuring pass behind "Fit columns": every width dropped, so the browser
+   lays each column out to its own content and the result can be read off it. It is
+   on screen for a single frame. */
+.tbl.is-measuring th, .tbl.is-measuring td { width: auto !important; min-width: 0 !important; max-width: none !important; white-space: nowrap; overflow: visible; }
+
+/* Wrap mode: every cell shows in full, over as many lines as it takes. The heading
+   stays on one line, because a heading is a label rather than the text being read,
+   and `vertical-align: top` already lines the wrapped rows up. */
+.tbl.is-wrap td { white-space: normal; overflow-wrap: anywhere; }
+.tbl.is-wrap td .cell-text { white-space: normal; overflow: visible; }
+
+/* Text in a cell that may be longer than its column. It is the column that decides
+   the width — never a max-width baked into the screen, which nothing can widen. */
+.cell-text { display: block; overflow: hidden; text-overflow: ellipsis; }
+
+/* The drag handle on a heading's right-hand edge. It is invisible until the pointer
+   is near it, so a row of headings does not read as a row of controls. */
+.col-grip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.col-grip::after {
+  content: '';
+  position: absolute;
+  top: 18%;
+  right: 3px;
+  width: 2px;
+  height: 64%;
+  border-radius: 1px;
+  background: transparent;
+  transition: background var(--dur-fast) var(--easing);
+}
+.tbl th:hover .col-grip::after { background: var(--border-strong); }
+.col-grip:hover::after, .col-grip:active::after { background: var(--hitachi-red); }
+
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* A numeric heading has to be right-aligned to sit over its numbers, and `.tbl th`
+   sets text-align: left. Two selectors, and the two-part one wins on specificity —
+   which is why every numeric heading used to sit at the LEFT of a column of
+   right-aligned figures. It has to be spelled out here to beat that, not left to
+   `.num` alone. */
+.tbl th.num { text-align: right; }
+
+/* A header is mono and letter-spaced; its trailing space would otherwise push a
+   right-aligned heading a hair off the column of figures underneath it. */
+.tbl th.num { padding-right: calc(14px - 0.06em); }
+
+/* The sort caret gets a fixed slot that is there whether or not this is the sorted
+   column, so sorting a table cannot shift its headings sideways. On a numeric
+   column the slot goes BEFORE the label, keeping the label's last character flush
+   with the figures below it. */
+.th-sort {
+  display: inline-block;
+  width: 0.9em;
+  text-align: center;
+  color: var(--hitachi-red);
+  font-size: 9px;
+  vertical-align: baseline;
+}
+
+/* An editable cell is an input filling the cell, and the input's own padding was
+   insetting its text from the column edge while the header stayed at the cell
+   padding. Pulling the control out by its padding puts the two back on the same
+   line, and a number in an input now right-aligns like every other number. */
+.tbl td .cell-input { margin: -3px -6px; width: calc(100% + 12px); }
+.tbl td select.cell-input { margin-right: 0; width: calc(100% + 6px); }
+.tbl td.num .cell-input { text-align: right; }
+
+.table-wrap {
+  overflow: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------------------------------------------------------------------------
+   Segmented control: two mutually exclusive readings of the same screen, where
+   separate buttons would read as two separate actions.
+   --------------------------------------------------------------------------- */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-3);
+}
+.seg-btn {
+  font-family: var(--f-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--easing), color var(--dur-fast) var(--easing);
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.is-on {
+  background: var(--white);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+.mono { font-family: var(--f-mono); font-size: 11.5px; }
+
+/* ===========================================================================
+   Badges and tags
+   =========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--f-ui);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  border-radius: 999px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+/* The leading dot is what makes these read as status rather than decoration. */
+.badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: none;
+}
+.badge-good { color: var(--good); background: var(--good-light); border-color: var(--good-border); }
+.badge-warn { color: var(--warn); background: var(--warn-light); border-color: var(--warn-border); }
+.badge-bad { color: var(--bad); background: var(--bad-light); border-color: var(--bad-border); }
+.badge-info { color: var(--info); background: var(--info-light); border-color: var(--info-border); }
+.badge-purple { color: var(--accent-purple); background: var(--accent-purple-light); border-color: rgba(109, 40, 217, 0.22); }
+.badge-muted { color: var(--text-muted); background: var(--surface-3); border-color: var(--border); }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/* ===========================================================================
+   Banners and inline notices
+   =========================================================================== */
+.notice {
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.notice-info { color: var(--info); background: var(--info-light); border-color: var(--info-border); }
+.notice-ok { color: var(--good); background: var(--good-light); border-color: var(--good-border); }
+.notice-warn { color: var(--warn); background: var(--warn-light); border-color: var(--warn-border); }
+.notice-error { color: var(--bad); background: var(--bad-light); border-color: var(--bad-border); }
+.notice a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Full-width strips across the top of the work area. */
+.strip {
+  font-size: 12px;
+  padding: 7px 28px;
+  border-bottom: 1px solid;
+}
+.strip-quiet { color: var(--text-muted); background: var(--surface); border-color: var(--line-soft); }
+.strip-warn { color: var(--warn); background: var(--warn-light); border-color: var(--warn-border); }
+.strip-error { color: var(--bad); background: var(--bad-light); border-color: var(--bad-border); }
+.strip-dirty { color: var(--hitachi-red-hover); background: var(--hitachi-red-light); border-color: rgba(230, 0, 18, 0.18); }
+.strip-new { color: var(--good); background: var(--good-light); border-color: var(--good-border); }
+
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  max-width: 34rem;
+  font-size: 13px;
+  border-radius: 10px;
+  padding: 11px 15px;
+  border: 1px solid;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in var(--dur) var(--easing);
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Drop targets: the Capture screen takes .eml and .msg files. */
+.dropzone {
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface-2);
+  transition: border-color var(--dur-fast) var(--easing), background var(--dur-fast) var(--easing);
+}
+.dropzone:hover { border-color: rgba(230, 0, 18, 0.4); background: var(--hitachi-red-light); }
+
+
+/* ===========================================================================
+   Ledger
+   =========================================================================== */
+.kbd {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.sidenav .kbd { background: transparent; border-color: rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.5); }
+
+/* The quick-add line: always at the top, always one keystroke away. */
+.qa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 28px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-soft);
+}
+.qa-dir {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid;
+  cursor: pointer;
+  background: none;
+}
+.qa-dir.dir-owe { color: var(--hitachi-red-hover); border-color: rgba(230, 0, 18, 0.3); background: var(--hitachi-red-light); }
+.qa-dir.dir-wait { color: var(--info); border-color: var(--info-border); background: var(--info-light); }
+.qa-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--f-input);
+  font-size: 15px;
+  font-weight: 500;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--white);
+}
+.qa-input:focus { outline: none; border-color: rgba(230, 0, 18, 0.45); box-shadow: var(--ring); }
+.qa-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 28px 8px; background: var(--surface); border-bottom: 1px solid var(--line-soft); margin-top: -1px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  white-space: nowrap;
+}
+.chip-l { font-family: var(--f-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-subtle); }
+.chip.is-warn { background: var(--warn-light); border-color: var(--warn-border); color: var(--warn); }
+.chip.is-new { background: var(--accent-purple-light); border-color: rgba(109, 40, 217, 0.22); color: var(--accent-purple); }
+button.chip { cursor: pointer; }
+button.chip:hover { border-color: var(--line-strong); }
+
+/* Item rows. */
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: grid;
+  grid-template-columns: 44px 22px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gray-100);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--easing);
+}
+.row:hover { background: var(--surface-2); }
+.row.is-sel { background: #fff7f7; box-shadow: inset 3px 0 0 var(--hitachi-red); }
+.row:last-child { border-bottom: 0; }
+.row-num { font-family: var(--f-mono); font-size: 11px; color: var(--text-subtle); padding-top: 2px; }
+.row-dir { padding-top: 1px; }
+.row-title { font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.35; }
+.row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+.row-why { font-size: 11.5px; color: var(--text-subtle); margin-top: 3px; }
+.row-acts { display: flex; gap: 4px; align-items: center; opacity: 0.35; transition: opacity var(--dur-fast) var(--easing); }
+.row:hover .row-acts, .row.is-sel .row-acts { opacity: 1; }
+.dir-ico { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; }
+.dir-ico.dir-owe { color: var(--hitachi-red); background: var(--hitachi-red-light); }
+.dir-ico.dir-wait { color: var(--info); background: var(--info-light); }
+.ico-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ico-btn:hover { background: var(--white); border-color: var(--line-soft); color: var(--text); }
+
+.section-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+/* Sections sit apart; a notice or card before the first one keeps its own margin. */
+section + section, .card + section, .notice + section { margin-top: 28px; }
+.section-t { font-family: var(--f-display); font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+.section-n { font-family: var(--f-mono); font-size: 10px; color: var(--text-subtle); letter-spacing: 0.08em; text-transform: uppercase; }
+.list-card { background: var(--card-bg); border: 1px solid var(--line-soft); border-radius: 8px; box-shadow: var(--shadow-sm); overflow: hidden; }
+
+.empty { padding: 28px 18px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.empty-t { font-weight: 600; color: var(--text); margin-bottom: 4px; }
+
+/* The drawer an item opens in. */
+.drawer-scrim { position: fixed; inset: 0; background: rgba(10, 10, 12, 0.18); z-index: 40; animation: fade var(--dur) var(--easing); }
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 96vw);
+  z-index: 41;
+  background: var(--surface);
+  border-left: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  animation: slide-in var(--dur) var(--easing);
+}
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.drawer-h { padding: 16px 20px 12px; border-bottom: 1px solid var(--line-soft); }
+.drawer-b { flex: 1; overflow: auto; padding: 16px 20px 24px; }
+.field { margin-bottom: 12px; }
+.field-l { display: block; font-family: var(--f-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-subtle); margin-bottom: 4px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.title-edit { width: 100%; font-family: var(--f-display); font-size: 18px; font-weight: 700; letter-spacing: -0.01em; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; margin: -3px -6px; background: none; }
+.title-edit:hover { border-color: var(--border-strong); }
+.title-edit:focus { outline: none; border-color: rgba(230, 0, 18, 0.45); box-shadow: var(--ring); background: var(--white); }
+.plan {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
+.plan b { font-weight: 700; }
+.history { list-style: none; margin: 0; padding: 0; }
+.history li { display: grid; grid-template-columns: 110px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--gray-200); font-size: 12px; }
+.history li:last-child { border-bottom: 0; }
+.history .h-when { font-family: var(--f-mono); font-size: 10.5px; color: var(--text-subtle); }
+.history .h-by { font-family: var(--f-mono); font-size: 9.5px; color: var(--accent-purple); margin-left: 6px; }
+
+/* Modals. */
+.modal-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(10, 10, 12, 0.32); display: grid; place-items: start center; padding: 8vh 16px; overflow: auto; animation: fade var(--dur) var(--easing); }
+.modal { width: min(640px, 100%); background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-lg); border: 1px solid var(--line-soft); }
+.modal-h { padding: 16px 20px 0; }
+.modal-b { padding: 14px 20px; }
+.modal-f { padding: 12px 20px 16px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line-soft); }
+.textarea { width: 100%; min-height: 160px; font-family: var(--f-ui); font-size: 13.5px; line-height: 1.5; border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px 12px; resize: vertical; background: var(--white); }
+.textarea:focus { outline: none; border-color: rgba(230, 0, 18, 0.45); box-shadow: var(--ring); }
+.textarea.mono-ta { font-family: var(--f-mono); font-size: 12px; }
+
+/* The command menu. */
+.cmd { width: min(620px, 100%); }
+.cmd-input { width: 100%; border: 0; border-bottom: 1px solid var(--line-soft); padding: 16px 18px; font-size: 16px; font-family: var(--f-ui); border-radius: 12px 12px 0 0; }
+.cmd-input:focus { outline: none; }
+.cmd-list { max-height: 50vh; overflow: auto; padding: 6px; }
+.cmd-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; }
+.cmd-item.is-on { background: var(--surface-3); }
+.cmd-group { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-subtle); padding: 8px 12px 4px; }
+
+/* Capture: suggestions with their source sentence. */
+.sugg { border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+.sugg + .sugg { margin-top: 8px; }
+.sugg.is-added { opacity: 0.55; }
+.sugg-quote { font-size: 12px; color: var(--text-muted); border-left: 3px solid var(--border-strong); padding-left: 8px; margin-top: 6px; font-style: italic; }
+.sugg-quote.is-ai { border-left-color: var(--accent-purple); }
+.hl { background: #fff3c4; border-radius: 2px; }
+
+/* People. */
+.people { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 18px; }
+.p-list a { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--gray-100); color: var(--text); text-decoration: none; font-size: 13px; }
+.p-list a:hover { background: var(--surface-2); }
+.p-list a.is-on { background: #fff7f7; box-shadow: inset 3px 0 0 var(--hitachi-red); }
+.stat-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Review. */
+.review-card { max-width: 760px; }
+.progress { height: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--hitachi-red); transition: width var(--dur) var(--easing); }
+
+/* The AI's marks: purple, as everything the model touched. */
+.ai-mark { display: inline-flex; align-items: center; gap: 4px; font-family: var(--f-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-purple); }
+
+.page { padding: 20px 28px 40px; }
+.page-narrow { max-width: 980px; }
+.hint { font-size: 12px; color: var(--text-muted); }
+.link { color: var(--brand-blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; }
+.toast-actions { display: inline-flex; gap: 10px; margin-left: 12px; }
+.toast-actions button { font: inherit; font-weight: 700; background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+.menu { position: absolute; z-index: 30; min-width: 180px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; box-shadow: var(--shadow-md); padding: 4px; }
+.menu button { display: block; width: 100%; text-align: left; font: inherit; font-size: 12.5px; padding: 7px 10px; border: 0; background: none; border-radius: 6px; cursor: pointer; color: var(--text); }
+.menu button:hover { background: var(--surface-3); }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--hitachi-red); }
+.setup { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(1200px 600px at 10% -10%, rgba(230, 0, 18, 0.07), transparent 60%), var(--app-bg); }
+.setup-card { width: min(760px, 100%); }
+.opt { display: block; width: 100%; text-align: left; border: 1px solid var(--line-soft); border-radius: 10px; padding: 14px 16px; background: var(--surface); cursor: pointer; transition: border-color var(--dur-fast) var(--easing), box-shadow var(--dur-fast) var(--easing); }
+.opt:hover { border-color: rgba(230, 0, 18, 0.35); box-shadow: var(--shadow-md); }
+.opt + .opt { margin-top: 10px; }
+.opt-t { font-weight: 700; font-size: 14px; }
+.opt-d { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+
+/* Segmented controls written as plain buttons with aria-pressed. */
+.seg { gap: 2px; }
+.seg button {
+  font-family: var(--f-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--easing), color var(--dur-fast) var(--easing);
+}
+.seg button:hover:not(:disabled) { color: var(--text); }
+.seg button[aria-pressed='true'] { background: var(--white); color: var(--text); box-shadow: var(--shadow-sm); }
+.seg button:disabled { cursor: default; }

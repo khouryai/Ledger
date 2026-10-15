@@ -1,0 +1,23 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# The built application IS committed: the laptop it runs on has no Node and no npm,
+# so dist/ and standalone/ are the delivered product. Rebuild with `npm run build`.
+!dist/
+!standalone/
+
+# A ledger folder or an export, in case one is ever placed inside the repository.
+# Real ledgers hold names and project work; they never belong in git.
+ledger.json
+backups/
+exports/
+*.xlsx
+*.eml
+*.msg
+
+# Playwright's own output.
+/test-results/
+/playwright-report/
+taskbar-shortcut-target.txt
