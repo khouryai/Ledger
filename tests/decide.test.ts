@@ -144,3 +144,30 @@ describe('today', () => {
     expect(age(item, makeCtx(doc, TODAY))).toMatchObject({ tone: 'bad', label: 'Due today' });
   });
 });
+
+describe('the days ahead', () => {
+  it('lists my deadlines and their promises in the next five working days, not today or later', async () => {
+    const { upcoming } = await import('../src/engine/decide');
+    let doc = docWith();
+    doc = add(doc, { title: 'mine soon', direction: 'owe', due: '2026-10-19' }).doc;
+    doc = add(doc, { title: 'their promise', personId: pid(doc, 'Sam'), due: '2026-10-16' }).doc;
+    doc = add(doc, { title: 'today', direction: 'owe', due: TODAY }).doc;
+    doc = add(doc, { title: 'far', direction: 'owe', due: '2026-11-30' }).doc;
+    expect(upcoming(makeCtx(doc, TODAY)).map((u) => [u.item.title, u.kind])).toEqual([
+      ['their promise', 'promise'],
+      ['mine soon', 'due'],
+    ]);
+  });
+  it('counts who owes me most, with how long the oldest has waited and what to chase now', async () => {
+    const { waitingByPerson } = await import('../src/engine/decide');
+    let doc = docWith();
+    doc = add(doc, { title: 'a', personId: pid(doc, 'Sam'), askedOn: '2026-10-01' }, at('2026-10-01')).doc;
+    doc = add(doc, { title: 'b', personId: pid(doc, 'Sam'), askedOn: '2026-10-14' }, at('2026-10-14')).doc;
+    doc = add(doc, { title: 'c', personId: pid(doc, 'Priya'), askedOn: '2026-10-14' }, at('2026-10-14')).doc;
+    const owed = waitingByPerson(makeCtx(doc, TODAY));
+    expect(owed.map((o) => [o.person.name, o.count, o.oldest, o.chaseNow.length])).toEqual([
+      ['Sam Lee', 2, 10, 1],
+      ['Priya Shah', 1, 1, 0],
+    ]);
+  });
+});

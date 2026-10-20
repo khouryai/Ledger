@@ -71,7 +71,7 @@ test('an item opens, is chased with a drafted email, then received and undone', 
   const errors = watch(page);
   await demo(page, 'wait');
   await page.locator('.row', { hasText: 'Cable schedule for HTT interlocking' }).click();
-  await expect(page.getByTestId('chase-plan')).toContainText('Next chase');
+  await expect(page.getByTestId('chase-plan')).toContainText('Chase now');
   await page.getByTestId('drawer-chase').click();
   await expect(page.getByTestId('chase-body')).toHaveValue(/Hi Jordan,/);
   await expect(page.getByTestId('chase-body')).toHaveValue(/Cable schedule for HTT interlocking/);
@@ -134,6 +134,7 @@ test('the on-device model path works end to end with the stand-in model', async 
   await expect(page.locator('.modal')).toContainText('written by the on-device model');
   await page.keyboard.press('Escape');
   // …and judges a reply, keeping the new date it gave.
+  await page.getByTestId('reply-toggle').click();
   await page.getByTestId('reply-text').fill('Sorry, still waiting on the vendor. I will have it to you by 12/1.');
   await page.getByTestId('reply-check').click();
   await expect(page.locator('.drawer')).toContainText('Not delivered');

@@ -83,18 +83,23 @@ export function Modal({ title, onClose, children, footer, wide, labelledBy = 'mo
   );
 }
 
-export function Empty({ title, children }: { title: string; children?: React.ReactNode }) {
+export function Empty({ title, children, icon }: { title: string; children?: React.ReactNode; icon?: IconName }) {
   return (
     <div className="empty">
+      {icon && (
+        <span className="empty-ico">
+          <Icon name={icon} size={18} />
+        </span>
+      )}
       <div className="empty-t">{title}</div>
-      {children}
+      {children && <div className="empty-d">{children}</div>}
     </div>
   );
 }
 
-export function Section({ title, count, children, aside }: { title: string; count?: number; children: React.ReactNode; aside?: React.ReactNode }) {
+export function Section({ title, count, children, aside, id }: { title: string; count?: number; children: React.ReactNode; aside?: React.ReactNode; id?: string }) {
   return (
-    <section>
+    <section id={id}>
       <div className="section-h">
         <div className="flex items-baseline gap-3">
           <h2 className="section-t">{title}</h2>
@@ -108,7 +113,7 @@ export function Section({ title, count, children, aside }: { title: string; coun
 }
 
 /** A small menu that opens under a button and closes on any outside click. */
-export function MenuButton({ label, icon, items, className = 'ico-btn', testid }: { label: string; icon?: IconName; items: { label: string; onClick: () => void }[]; className?: string; testid?: string }) {
+export function MenuButton({ label, icon, items, className = 'ico-btn', testid, showLabel }: { label: string; icon?: IconName; items: { label: string; onClick: () => void }[]; className?: string; testid?: string; showLabel?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -124,15 +129,18 @@ export function MenuButton({ label, icon, items, className = 'ico-btn', testid }
       <button
         type="button"
         className={className}
-        aria-label={label}
-        title={label}
+        aria-label={showLabel ? undefined : label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={showLabel ? undefined : label}
         data-testid={testid}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((o) => !o);
         }}
       >
-        {icon ? <Icon name={icon} size={15} /> : label}
+        {icon && <Icon name={icon} size={showLabel ? 14 : 15} />}
+        {(showLabel || !icon) && label}
       </button>
       {open && (
         <span className="menu" style={{ right: 0, top: '100%' }} role="menu">
@@ -152,6 +160,17 @@ export function MenuButton({ label, icon, items, className = 'ico-btn', testid }
           ))}
         </span>
       )}
+    </span>
+  );
+}
+
+/** Initials in a circle: a person is recognised by shape faster than by reading. */
+export function Avatar({ name, size = 22 }: { name: string; size?: number }) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const initials = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+  return (
+    <span className="avatar" style={{ width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.42)) }} aria-hidden="true">
+      {initials || '?'}
     </span>
   );
 }

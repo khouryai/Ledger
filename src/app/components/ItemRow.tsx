@@ -7,7 +7,7 @@ import { makeFmt } from '../format';
 import { href } from '../router';
 import { useApp } from '../state';
 import { Icon } from './icons';
-import { Badge, IconButton, MenuButton } from './ui';
+import { Avatar, Badge, IconButton, MenuButton } from './ui';
 
 /** Snooze choices, as days from today. */
 export function snoozeChoices(today: Day, cal: ReturnType<typeof calendarOf>): { label: string; day: Day }[] {
@@ -41,7 +41,12 @@ export function useItemActions() {
   };
 }
 
-export function ItemRow({ item, reason, selected, onSelect }: { item: Item; reason?: string; selected?: boolean; onSelect?: () => void }) {
+/**
+ * One item in a list. The title is a real button stretched over the whole row, so the
+ * row opens with a click anywhere, is reachable with Tab, and announces itself; the
+ * person link and the actions sit above it and stay separate controls.
+ */
+export function ItemRow({ item, reason, selected, onSelect, hidePerson }: { item: Item; reason?: string; selected?: boolean; onSelect?: () => void; hidePerson?: boolean }) {
   const { state, ctx } = useApp();
   const doc = state.doc;
   const fmt = makeFmt(doc.settings.dateOrder, state.today, ctx.cal);
@@ -52,30 +57,31 @@ export function ItemRow({ item, reason, selected, onSelect }: { item: Item; reas
   const rk = risk(item, ctx);
   const blockers = item.blockedBy.map((id) => doc.items.find((x) => x.id === id)).filter((x): x is Item => !!x && x.status === 'open');
   const snoozed = isSnoozed(item, state.today);
+  const chaseDue = !!plan && item.status === 'open' && !snoozed && plan.day <= state.today;
+  const dirWord = item.direction === 'owe' ? 'I owe' : 'Waiting on';
 
   return (
-    <div
-      className={`row${selected ? ' is-sel' : ''}`}
-      role="button"
-      tabIndex={-1}
-      data-item={item.num}
-      onClick={() => {
-        onSelect?.();
-        a.open(item);
-      }}
-    >
-      <div className="row-num">#{item.num}</div>
-      <div className="row-dir">
-        <span className={`dir-ico dir-${item.direction}`} title={item.direction === 'owe' ? 'I owe' : 'Waiting on'}>
-          <Icon name={item.direction} size={14} />
-        </span>
-      </div>
+    <div className={`row${selected ? ' is-sel' : ''}${item.status !== 'open' ? ' is-closed' : ''}`} data-item={item.num} data-tone={ag.tone}>
+      <span className={`dir-ico dir-${item.direction}`} title={dirWord}>
+        <Icon name={item.direction} size={14} />
+      </span>
       <div className="min-w-0">
-        <div className="row-title">{item.title}</div>
+        <button
+          type="button"
+          className="row-open"
+          aria-label={`#${item.num} ${item.title}. ${dirWord}${p ? ` ${p.name}` : ''}. ${ag.label}.`}
+          onFocus={onSelect}
+          onClick={() => {
+            onSelect?.();
+            a.open(item);
+          }}
+        >
+          <span className="row-title">{item.title}</span>
+        </button>
         <div className="row-meta">
-          {p && (
-            <a href={href('people', { id: p.id })} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-[var(--text)] no-underline hover:underline">
-              <Icon name="user" size={12} /> {p.name}
+          {p && !hidePerson && (
+            <a href={href('people', { id: p.id })} className="row-person" title={`${p.name}${p.company ? `, ${p.company}` : ''}`}>
+              <Avatar name={p.name} size={18} /> {p.name}
             </a>
           )}
           <Badge tone={ag.tone}>{ag.label}</Badge>
@@ -85,33 +91,46 @@ export function ItemRow({ item, reason, selected, onSelect }: { item: Item; reas
             </span>
           )}
           {plan && item.status === 'open' && !snoozed && (
-            <span title={plan.reason} className={plan.day <= state.today ? 'font-semibold text-[var(--hitachi-red-hover)]' : ''}>
-              Chase {plan.day <= state.today ? 'now' : fmt.day(plan.day)}
-              {plan.level !== 'nudge' ? ` (${plan.level === 'firm' ? 'firm' : 'escalate'})` : ''}
+            <span title={plan.reason} className={chaseDue ? 'row-chase-now' : ''}>
+              {chaseDue ? 'Chase now' : `Chase ${fmt.day(plan.day)}`}
+              {plan.level !== 'nudge' ? ` · ${plan.level === 'firm' ? 'firm' : 'escalate'}` : ''}
             </span>
           )}
           {snoozed && (
-            <span>
+            <span className="inline-flex items-center gap-1">
               <Icon name="moon" size={12} /> Snoozed to {fmt.day(item.snoozeUntil)}
             </span>
           )}
-          {blockers.length > 0 && <span title={blockers.map((b) => `#${b.num} ${b.title}`).join('\n')}>Needs {blockers.map((b) => `#${b.num}`).join(', ')}</span>}
-          {rk && <Badge tone={rk.level === 'risk' ? 'bad' : 'warn'} title={rk.reason}>{rk.level === 'risk' ? 'At risk' : 'Input has no date'}</Badge>}
-          {item.recur && <Icon name="repeat" size={12} title="Recurs" />}
+          {blockers.length > 0 && (
+            <span className="inline-flex items-center gap-1" title={blockers.map((b) => `#${b.num} ${b.title}`).join('\n')}>
+              <Icon name="link" size={12} /> Needs {blockers.map((b) => `#${b.num}`).join(', ')}
+            </span>
+          )}
+          {rk && (
+            <Badge tone={rk.level === 'risk' ? 'bad' : 'warn'} title={rk.reason}>
+              {rk.level === 'risk' ? 'At risk' : 'Input has no date'}
+            </Badge>
+          )}
+          {item.recur && (
+            <span className="inline-flex items-center gap-1" title="Repeats">
+              <Icon name="repeat" size={12} /> {item.recur.unit === 'day' ? 'daily' : item.recur.unit === 'week' ? (item.recur.every === 2 ? 'fortnightly' : 'weekly') : 'monthly'}
+            </span>
+          )}
           {item.tags.map((t) => (
-            <span key={t} className="mono">
+            <span key={t} className="row-tag">
               #{t}
             </span>
           ))}
+          <span className="row-num">#{item.num}</span>
         </div>
         {reason && <div className="row-why">{reason}</div>}
       </div>
       {item.status === 'open' ? (
         <div className="row-acts">
-          {item.direction === 'wait' && <IconButton icon="mail" label="Chase" onClick={() => a.chase([item.id])} testid={`chase-${item.num}`} />}
-          <IconButton icon="check" label={item.direction === 'wait' ? 'Received' : 'Done'} onClick={() => a.close(item)} testid={`done-${item.num}`} />
+          {item.direction === 'wait' && <IconButton icon="mail" label={`Chase #${item.num}`} onClick={() => a.chase([item.id])} testid={`chase-${item.num}`} />}
+          <IconButton icon="check" label={`${item.direction === 'wait' ? 'Received' : 'Done'}: #${item.num}`} onClick={() => a.close(item)} testid={`done-${item.num}`} />
           <MenuButton
-            label="Snooze"
+            label={`Snooze #${item.num}`}
             icon="moon"
             testid={`snooze-${item.num}`}
             items={[...a.snoozeChoices().map((c) => ({ label: `${c.label} (${fmt.day(c.day)})`, onClick: () => a.snooze(item, c.day) })), ...(snoozed ? [{ label: 'Wake now', onClick: () => a.snooze(item, undefined) }] : [])]}
@@ -134,14 +153,18 @@ export function useListKeys(items: Item[], enabled = true) {
     const onKey = (e: KeyboardEvent) => {
       if (ui.openItem || ui.chase || ui.command || e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement;
-      if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (t.closest('input, textarea, select, [contenteditable="true"], [role="menu"]')) return;
+      // A focused row's own button opens it on Enter; do not open it twice.
+      if (e.key === 'Enter' && t.closest('button, a')) return;
       const i = items.findIndex((x) => x.id === sel);
       const cur = i >= 0 ? items[i] : undefined;
       const move = (n: number) => {
         const next = items[Math.min(items.length - 1, Math.max(0, (i < 0 ? -1 : i) + n))];
         if (next) {
           setSel(next.id);
-          document.querySelector(`[data-item="${next.num}"]`)?.scrollIntoView({ block: 'nearest' });
+          const btn = document.querySelector<HTMLButtonElement>(`[data-item="${next.num}"] .row-open`);
+          btn?.focus({ preventScroll: true });
+          btn?.closest('.row')?.scrollIntoView({ block: 'nearest' });
         }
       };
       if (e.key === 'j' || e.key === 'ArrowDown') move(1);

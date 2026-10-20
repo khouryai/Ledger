@@ -58,3 +58,14 @@ export function Icon({ name, size = 16, className, title }: { name: IconName; si
     </svg>
   );
 }
+
+/** Ledger's mark: an arrow out in red (what I owe) over an arrow in (what I am owed). */
+export function LogoMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="logo-mark">
+      <rect width="32" height="32" rx="7" fill="var(--near-black)" stroke="rgba(255,255,255,0.08)" />
+      <path d="M8 12h16M24 12l-4.5-4.2M24 12l-4.5 4.2" stroke="var(--hitachi-red)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M24 21H8M8 21l4.5-4.2M8 21l4.5 4.2" stroke="var(--white)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}

@@ -105,6 +105,8 @@ function PersonCard({ person }: { person: Person }) {
   const closed = mine.filter((i) => i.status !== 'open').sort((a, b) => (b.closedOn ?? '').localeCompare(a.closedOn ?? ''));
   const [brief, setBrief] = useState('');
   const [writing, setWriting] = useState(false);
+  // Open at first only when the email is missing; after that it is the user's.
+  const [moreOpen] = useState(!person.email);
   const set = (patch: Partial<Person>) => actions.apply((d) => updatePerson(d, person.id, patch));
 
   const facts = () => {
@@ -129,7 +131,7 @@ function PersonCard({ person }: { person: Person }) {
               <Badge tone={st.learned ? 'purple' : 'muted'} title={st.learned ? 'Their own pattern is used for chasing and for expecting arrivals' : `The defaults apply until ${s.learnAfter} items have been received from them`}>
                 {st.learned ? `Learned from ${st.samples} items` : `${st.samples} of ${s.learnAfter} items to learn from`}
               </Badge>
-              <span className="hint">Chased {r.reason}.</span>
+              <span className="hint">Chase rhythm: {r.reason}.</span>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -181,53 +183,12 @@ function PersonCard({ person }: { person: Person }) {
           <Fact label="Promises kept" value={st.promisesKept !== null ? `${Math.round(st.promisesKept * 100)}%` : '—'} sub={st.promised ? `of ${st.promised}` : undefined} />
           <Fact label="Chases needed" value={st.chasesNeeded !== null ? String(st.chasesNeeded) : '—'} sub="median" />
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-x-4">
-          <label className="field block">
-            <span className="field-l">Email</span>
-            <CommitInput value={person.email ?? ''} placeholder="name@company.com" onCommit={(v) => set({ email: v.trim() || undefined })} />
-          </label>
-          <label className="field block">
-            <span className="field-l">Company</span>
-            <CommitInput value={person.company ?? ''} onCommit={(v) => set({ company: v.trim() || undefined })} />
-          </label>
-          <label className="field block">
-            <span className="field-l">Role</span>
-            <CommitInput value={person.role ?? ''} onCommit={(v) => set({ role: v.trim() || undefined })} />
-          </label>
-          <label className="field block">
-            <span className="field-l">Chase every (working days)</span>
-            <CommitInput
-              value={person.chaseEvery ? String(person.chaseEvery) : ''}
-              placeholder="learned, or your default"
-              onCommit={(v) => {
-                const n = Number(v);
-                set({ chaseEvery: v.trim() && Number.isFinite(n) && n > 0 ? Math.round(n) : undefined });
-              }}
-            />
-          </label>
-          <label className="field block">
-            <span className="field-l">Copy on an escalation: name</span>
-            <CommitInput value={person.escalateTo?.name ?? ''} placeholder="Their manager" onCommit={(v) => set({ escalateTo: v.trim() ? { name: v.trim(), email: person.escalateTo?.email } : undefined })} />
-          </label>
-          <label className="field block">
-            <span className="field-l">Copy on an escalation: email</span>
-            <CommitInput
-              value={person.escalateTo?.email ?? ''}
-              onCommit={(v) => set({ escalateTo: person.escalateTo || v.trim() ? { name: person.escalateTo?.name ?? v.trim(), email: v.trim() || undefined } : undefined })}
-            />
-          </label>
-        </div>
-        <label className="field block">
-          <span className="field-l">Notes</span>
-          <CommitInput multiline className="textarea" value={person.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || undefined })} />
-        </label>
       </div>
 
       <Section title="They owe me" count={theyOwe.length}>
         <div className="list-card rows">
           {theyOwe.map((i) => (
-            <ItemRow key={i.id} item={i} />
+            <ItemRow key={i.id} item={i} hidePerson />
           ))}
           {!theyOwe.length && <Empty title="Nothing outstanding from them." />}
         </div>
@@ -235,7 +196,7 @@ function PersonCard({ person }: { person: Person }) {
       <Section title="I owe them" count={iOwe.length}>
         <div className="list-card rows">
           {iOwe.map((i) => (
-            <ItemRow key={i.id} item={i} />
+            <ItemRow key={i.id} item={i} hidePerson />
           ))}
           {!iOwe.length && <Empty title="You owe them nothing." />}
         </div>
@@ -244,11 +205,59 @@ function PersonCard({ person }: { person: Person }) {
         <Section title="Closed" count={closed.length}>
           <div className="list-card rows">
             {closed.slice(0, 20).map((i) => (
-              <ItemRow key={i.id} item={i} />
+              <ItemRow key={i.id} item={i} hidePerson />
             ))}
           </div>
         </Section>
       )}
+      <details className="card person-more mt-4" open={moreOpen}>
+        <summary>
+          <span className="card-title text-[13px]">Contact and chasing</span>
+          <span className="hint">{person.email ? [person.email, person.company, person.role].filter(Boolean).join(' · ') : 'No email yet, so a chaser opens with nobody in To.'}</span>
+        </summary>
+        <div className="mt-3">
+          <div className="grid grid-cols-2 gap-x-4">
+            <label className="field block">
+              <span className="field-l">Email</span>
+              <CommitInput value={person.email ?? ''} placeholder="name@company.com" onCommit={(v) => set({ email: v.trim() || undefined })} />
+            </label>
+            <label className="field block">
+              <span className="field-l">Company</span>
+              <CommitInput value={person.company ?? ''} onCommit={(v) => set({ company: v.trim() || undefined })} />
+            </label>
+            <label className="field block">
+              <span className="field-l">Role</span>
+              <CommitInput value={person.role ?? ''} onCommit={(v) => set({ role: v.trim() || undefined })} />
+            </label>
+            <label className="field block">
+              <span className="field-l">Chase every (working days)</span>
+              <CommitInput
+                value={person.chaseEvery ? String(person.chaseEvery) : ''}
+                placeholder="learned, or your default"
+                onCommit={(v) => {
+                  const n = Number(v);
+                  set({ chaseEvery: v.trim() && Number.isFinite(n) && n > 0 ? Math.round(n) : undefined });
+                }}
+              />
+            </label>
+            <label className="field block">
+              <span className="field-l">Copy on an escalation: name</span>
+              <CommitInput value={person.escalateTo?.name ?? ''} placeholder="Their manager" onCommit={(v) => set({ escalateTo: v.trim() ? { name: v.trim(), email: person.escalateTo?.email } : undefined })} />
+            </label>
+            <label className="field block">
+              <span className="field-l">Copy on an escalation: email</span>
+              <CommitInput
+                value={person.escalateTo?.email ?? ''}
+                onCommit={(v) => set({ escalateTo: person.escalateTo || v.trim() ? { name: person.escalateTo?.name ?? v.trim(), email: v.trim() || undefined } : undefined })}
+              />
+            </label>
+          </div>
+          <label className="field block">
+            <span className="field-l">Notes</span>
+            <CommitInput multiline className="textarea" value={person.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || undefined })} />
+          </label>
+        </div>
+      </details>
       <Section title="Tidy up">
         <div className="card flex flex-wrap items-center gap-3">
           <select

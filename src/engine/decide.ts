@@ -310,3 +310,45 @@ export function today(ctx: Ctx): Today {
 export function todayCount(t: Today): number {
   return t.due.length + t.chase.length + t.risk.length + t.unblocked.length + t.woke.length;
 }
+
+// ── The days ahead, and who owes what ───────────────────────────────────────
+
+export type Upcoming = { item: Item; day: Day; kind: 'due' | 'promise' };
+
+/**
+ * What lands in the next few working days: my deadlines after today, and the dates
+ * others promised me. Today's own deadlines are in Today's first section already.
+ */
+export function upcoming(ctx: Ctx, workingDays = 5): Upcoming[] {
+  const until = addWorkingDays(ctx.today, workingDays, ctx.cal);
+  const out: Upcoming[] = [];
+  for (const it of ctx.doc.items) {
+    if (it.status !== 'open' || !it.due || isSnoozed(it, ctx.today)) continue;
+    if (it.due <= ctx.today || it.due > until) continue;
+    out.push({ item: it, day: it.due, kind: it.direction === 'owe' ? 'due' : 'promise' });
+  }
+  return out.sort((a, b) => a.day.localeCompare(b.day) || a.item.num - b.item.num);
+}
+
+export type Owed = { person: Person; count: number; oldest: number; chaseNow: string[] };
+
+/** Open waiting items by person, most first: who owes me the most, and for how long. */
+export function waitingByPerson(ctx: Ctx): Owed[] {
+  const by = new Map<string, Owed>();
+  for (const it of ctx.doc.items) {
+    if (it.status !== 'open' || it.direction !== 'wait' || !it.personId) continue;
+    const person = person_(ctx, it.personId);
+    if (!person) continue;
+    const cur = by.get(person.id) ?? { person, count: 0, oldest: 0, chaseNow: [] };
+    cur.count++;
+    cur.oldest = Math.max(cur.oldest, workingDaysBetween(it.askedOn, ctx.today, ctx.cal));
+    const plan = chasePlan(it, ctx);
+    if (plan && plan.day <= ctx.today && !isSnoozed(it, ctx.today)) cur.chaseNow.push(it.id);
+    by.set(person.id, cur);
+  }
+  return [...by.values()].sort((a, b) => b.count - a.count || b.oldest - a.oldest || a.person.name.localeCompare(b.person.name));
+}
+
+function person_(ctx: Ctx, id: string): Person | undefined {
+  return ctx.doc.people.find((p) => p.id === id);
+}

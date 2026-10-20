@@ -27,8 +27,16 @@ export function Items({ route }: { route: Route }) {
   const [query, setQuery] = useState(route.params.get('q') ?? '');
   useEffect(() => setStatus(kind === 'all' ? 'all' : 'open'), [kind]);
 
+  const base = { direction: kind === 'all' ? undefined : kind, personId: personId || undefined, tag: tag || undefined, query: query || undefined } as const;
+  const counts = useMemo(
+    () => Object.fromEntries((['open', 'snoozed', 'closed', 'all'] as const).map((st) => [st, filterItems(ctx, { ...base, status: st }).length])) as Record<NonNullable<ItemFilter['status']>, number>,
+    [ctx, kind, personId, tag, query],
+  );
+  const filtered = !!(query || personId || tag);
+  const clear = () => (setQuery(''), setPersonId(''), setTag(''));
+
   const items = useMemo(() => {
-    const list = filterItems(ctx, { direction: kind === 'all' ? undefined : kind, status, personId: personId || undefined, tag: tag || undefined, query: query || undefined });
+    const list = filterItems(ctx, { ...base, status });
     return status === 'closed' ? [...list].sort((a, b) => (b.closedOn ?? '').localeCompare(a.closedOn ?? '') || b.num - a.num) : sortWorking(list, ctx);
   }, [ctx, kind, status, personId, tag, query]);
   const { sel, setSel } = useListKeys(items);
@@ -90,6 +98,7 @@ export function Items({ route }: { route: Route }) {
             {(['open', 'snoozed', 'closed', 'all'] as const).map((s) => (
               <button key={s} type="button" aria-pressed={status === s} onClick={() => setStatus(s)}>
                 {s === 'open' ? 'Open' : s === 'snoozed' ? 'Snoozed' : s === 'closed' ? 'Closed' : 'All'}
+                <span className="seg-n">{counts[s]}</span>
               </button>
             ))}
           </div>
@@ -112,16 +121,31 @@ export function Items({ route }: { route: Route }) {
             </select>
           )}
           <input className="input min-w-[220px] flex-1" placeholder="Search, or #12 for an item" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search" data-testid="items-search" />
+          {filtered && (
+            <button type="button" className="btn" onClick={clear}>
+              <Icon name="x" size={14} /> Clear
+            </button>
+          )}
         </div>
         <div className="list-card rows">
           {items.map((it) => (
             <ItemRow key={it.id} item={it} selected={sel === it.id} onSelect={() => setSel(it.id)} />
           ))}
-          {!items.length && (
-            <Empty title={query || personId || tag ? 'Nothing matches.' : status === 'open' ? (kind === 'owe' ? 'You owe nobody anything. Enjoy it.' : kind === 'wait' ? 'Nobody owes you anything right now.' : 'Nothing open.') : 'Nothing here.'}>
-              {status === 'open' && !query && 'Add one in the line at the top.'}
-            </Empty>
-          )}
+          {!items.length &&
+            (filtered ? (
+              <Empty icon="search" title="Nothing matches.">
+                {counts.all > 0 ? `${counts.all} ${counts.all === 1 ? 'item matches' : 'items match'} with every status. ` : ''}
+                <button type="button" className="link" onClick={clear}>
+                  Clear the filters
+                </button>
+              </Empty>
+            ) : status === 'open' ? (
+              <Empty icon="check" title={kind === 'owe' ? 'You owe nobody anything.' : kind === 'wait' ? 'Nobody owes you anything right now.' : 'Nothing open.'}>
+                Add one in the line at the top: <span className="mono">{kind === 'owe' ? 'owe: ' : ''}@Sam ATS report by fri</span>
+              </Empty>
+            ) : (
+              <Empty icon={status === 'snoozed' ? 'moon' : 'inbox'} title={status === 'snoozed' ? 'Nothing snoozed.' : status === 'closed' ? 'Nothing closed yet.' : 'Nothing here.'} />
+            ))}
         </div>
       </div>
     </div>

@@ -22,30 +22,85 @@ export function Settings() {
   return (
     <div>
       <Hero eyebrow="Setup" title="Settings" sub="Everything here is saved in the ledger file itself, so it travels with it." />
-      <div className="page page-narrow">
-        <Storage />
-        <Section title="You">
-          <div className="card grid2">
-            <label className="field block">
-              <span className="field-l">Your name</span>
-              <CommitInput value={s.myName} placeholder="Alex Khoury" onCommit={(v) => set({ myName: v.trim() })} testid="set-name" />
-              <span className="form-hint">Chasers are signed with it.</span>
-            </label>
-            <label className="field block">
-              <span className="field-l">Your email</span>
-              <CommitInput value={s.myEmail} placeholder="you@company.com" onCommit={(v) => set({ myEmail: v.trim().toLowerCase() })} testid="set-email" />
-              <span className="form-hint">Tells Capture which emails in a thread are yours.</span>
-            </label>
-          </div>
-        </Section>
-        <WorkingWeek />
-        <Chasing />
-        <Templates />
-        <AiSettings />
-        <OutlookSettings />
-        <About />
+      <div className="page settings-page">
+        <SettingsToc />
+        <div className="min-w-0">
+          <Storage />
+          <Section id="s-you" title="You">
+            <div className="card grid2">
+              <label className="field block">
+                <span className="field-l">Your name</span>
+                <CommitInput value={s.myName} placeholder="Alex Khoury" onCommit={(v) => set({ myName: v.trim() })} testid="set-name" />
+                <span className="form-hint">Chasers are signed with it.</span>
+              </label>
+              <label className="field block">
+                <span className="field-l">Your email</span>
+                <CommitInput value={s.myEmail} placeholder="you@company.com" onCommit={(v) => set({ myEmail: v.trim().toLowerCase() })} testid="set-email" />
+                <span className="form-hint">Tells Capture which emails in a thread are yours.</span>
+              </label>
+            </div>
+          </Section>
+          <WorkingWeek />
+          <Chasing />
+          <Templates />
+          <AiSettings />
+          <OutlookSettings />
+          <About />
+        </div>
       </div>
     </div>
+  );
+}
+
+const TOC: [string, string][] = [
+  ['s-storage', 'Where it lives'],
+  ['s-you', 'You'],
+  ['s-week', 'Working week'],
+  ['s-chasing', 'Chasing'],
+  ['s-wording', 'Chaser wording'],
+  ['s-ai', 'On-device AI'],
+  ['s-outlook', 'Outlook'],
+  ['s-about', 'About'],
+];
+
+/** The sections down the side, the one in view marked. Buttons, not links: the hash is the router's. */
+function SettingsToc() {
+  const [on, setOn] = useState(TOC[0][0]);
+  useEffect(() => {
+    const seen = new Map<string, boolean>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+        const first = TOC.find(([id]) => seen.get(id));
+        if (first) setOn(first[0]);
+      },
+      { rootMargin: '-15% 0px -55% 0px' },
+    );
+    for (const [id] of TOC) {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    }
+    return () => io.disconnect();
+  }, []);
+  return (
+    <nav className="toc" aria-label="Settings sections">
+      <div className="eyebrow mb-2">On this page</div>
+      {TOC.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          className={on === id ? 'is-on' : ''}
+          aria-current={on === id ? 'true' : undefined}
+          onClick={() => {
+            const el = document.getElementById(id);
+            el?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+            setOn(id);
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -61,7 +116,7 @@ function Storage() {
   }, [actions, state.lastSavedAt]);
   const where = state.mode === 'folder' ? `The folder "${state.where}"` : state.mode === 'browser' ? 'This browser (IndexedDB)' : 'Nowhere: nothing is being saved';
   return (
-    <Section title="Where your ledger lives">
+    <Section id="s-storage" title="Where your ledger lives">
       <div className="card">
         <div className="text-[13px]">
           <b>{where}</b>
@@ -140,7 +195,7 @@ function WorkingWeek() {
   const fmt = makeFmt(s.dateOrder, state.today, calendarOf(s));
   const set = (patch: Partial<S>) => actions.apply((d) => updateSettings(d, patch));
   return (
-    <Section title="Working week and dates">
+    <Section id="s-week" title="Working week and dates">
       <div className="card">
         <span className="field-l">Working days</span>
         <div className="flex flex-wrap gap-2">
@@ -206,7 +261,7 @@ function Chasing() {
   const s = state.doc.settings;
   const set = (patch: Partial<S>) => actions.apply((d) => updateSettings(d, patch));
   return (
-    <Section title="Chasing and the review">
+    <Section id="s-chasing" title="Chasing and the review">
       <div className="card grid2">
         <Num label="Chase every (working days)" value={s.chase.every} min={1} onChange={(n) => set({ chase: { ...s.chase, every: n } })} hint="Until a person's own pattern is learned." />
         <Num label="Suggest escalating after (chases)" value={s.chase.escalateAfter} min={1} onChange={(n) => set({ chase: { ...s.chase, escalateAfter: n } })} hint="Chases with no movement in between." />
@@ -238,7 +293,7 @@ function Templates() {
   const t = state.doc.settings.templates;
   const set = (k: keyof S['templates'], patch: Partial<S['templates'][keyof S['templates']]>) => actions.apply((d) => updateSettings(d, { templates: { ...d.settings.templates, [k]: { ...d.settings.templates[k], ...patch } } }));
   return (
-    <Section title="Chaser wording">
+    <Section id="s-wording" title="Chaser wording">
       <div className="card">
         <p className="hint mb-3">
           Placeholders: <span className="mono">{'{first} {name} {title} {asked} {waited} {promised} {subject} {me} {escalateTo} {list} {count}'}</span>. A line whose placeholders all come out empty is left out.
@@ -283,7 +338,7 @@ function AiSettings() {
   }, [s.ai.mode, s.ai.model, status.state]);
 
   return (
-    <Section title="On-device AI">
+    <Section id="s-ai" title="On-device AI">
       <div className="card">
         <p className="text-[13px]">
           An open-source language model that runs on this laptop's graphics chip, inside the browser. It reads emails and notes for actions, writes chasers, judges replies and writes your
@@ -393,7 +448,7 @@ function OutlookSettings() {
   const set = (patch: Partial<S['outlook']>) => actions.apply((d) => updateSettings(d, { outlook: { ...d.settings.outlook, ...patch } }));
   const redirect = typeof location !== 'undefined' && location.protocol.startsWith('http') ? `${location.origin}/auth.html` : 'http://localhost:47810/auth.html';
   return (
-    <Section title="Outlook">
+    <Section id="s-outlook" title="Outlook">
       <div className="card">
         <p className="text-[13px]">
           Reads your sent mail, flags and calendar through Microsoft Graph to suggest items. It needs IT to register Ledger in Microsoft Entra (a single-page app, redirect address{' '}
@@ -424,7 +479,7 @@ function OutlookSettings() {
 function About() {
   const { actions } = useApp();
   return (
-    <Section title="About and shortcuts">
+    <Section id="s-about" title="About and shortcuts">
       <div className="card text-[13px]">
         <div>
           Build {buildLabel()}, running from <span className="mono">{runningFrom()}</span>.

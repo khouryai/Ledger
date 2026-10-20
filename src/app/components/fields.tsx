@@ -46,7 +46,7 @@ export function DateField({ value, onChange, placeholder = 'fri, 11/14, +3d', la
           }
         }}
       />
-      <span className="form-hint">{bad ? 'Not a date I can read. Try fri, 11/14 or +3d.' : parsed ? fmt.both(parsed) : value ? fmt.both(value) : 'None'}</span>
+      <span className="form-hint">{bad ? 'Not a date I can read. Try fri, 11/14 or +3d.' : parsed ? fmt.both(parsed) : value ? fmt.both(value) : '\u00a0'}</span>
     </label>
   );
 }

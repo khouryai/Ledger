@@ -122,32 +122,38 @@ export function SuggestionList({ drafts, setDrafts, source, emptyText }: { draft
                 )}
                 {d.added && <Badge tone="good">Added</Badge>}
               </div>
-              {!d.added && (
-                <div className="mt-2 grid grid-cols-2 gap-x-3">
-                  {d.newPerson ? (
-                    <div className="field">
-                      <span className="field-l">{d.direction === 'owe' ? 'For' : 'From'}</span>
-                      <span className="chip is-new">
-                        <span className="chip-l">New person</span> {d.newPerson}
-                      </span>{' '}
-                      <button type="button" className="link text-[12px]" onClick={() => update(d.key, { newPerson: undefined })}>
-                        choose someone else
-                      </button>
-                    </div>
-                  ) : (
-                    <PersonField label={d.direction === 'owe' ? 'For' : 'From'} value={d.personId} onChange={(id, name) => update(d.key, name ? { newPerson: name, personId: undefined } : { personId: id })} />
-                  )}
-                  <DateField label={d.direction === 'owe' ? 'Due' : 'They promised'} value={d.due} onChange={(v) => update(d.key, { due: v })} />
-                </div>
-              )}
+              <div className={`sugg-fields${d.added ? ' is-added' : ''}`}>
+                {!d.added && (
+                  <>
+                    {d.newPerson ? (
+                      <div className="field">
+                        <span className="field-l">{d.direction === 'owe' ? 'For' : 'From'}</span>
+                        <span className="chip is-new">
+                          <span className="chip-l">New person</span> {d.newPerson}
+                        </span>{' '}
+                        <button type="button" className="link text-[12px]" onClick={() => update(d.key, { newPerson: undefined })}>
+                          someone else
+                        </button>
+                      </div>
+                    ) : (
+                      <PersonField label={d.direction === 'owe' ? 'For' : 'From'} value={d.personId} onChange={(id, name) => update(d.key, name ? { newPerson: name, personId: undefined } : { personId: id })} />
+                    )}
+                    <DateField label={d.direction === 'owe' ? 'Due' : 'They promised'} value={d.due} onChange={(v) => update(d.key, { due: v })} />
+                  </>
+                )}
+                {(d.quote || d.askedOn) && (
+                  <div className="sugg-src">
+                    {d.quote && (
+                      <div className={`sugg-quote${d.from === 'ai' ? ' is-ai' : ''}`}>
+                        "{d.quote}"
+                        {d.from === 'ai' && d.quoteFound === false && <span className="not-italic text-[var(--warn)]"> (the model's words; not found in the text)</span>}
+                      </div>
+                    )}
+                    {d.askedOn && <div className="hint mt-1">Asked {fmt.day(d.askedOn)}</div>}
+                  </div>
+                )}
+              </div>
               {d.note && <div className="hint">{d.note}</div>}
-              {d.quote && (
-                <div className={`sugg-quote${d.from === 'ai' ? ' is-ai' : ''}`}>
-                  "{d.quote}"
-                  {d.from === 'ai' && d.quoteFound === false && <span className="not-italic text-[var(--warn)]"> (the model's words; not found in the text)</span>}
-                </div>
-              )}
-              {d.askedOn && <div className="hint mt-1">Asked {fmt.day(d.askedOn)}</div>}
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 /* Generated at build time. Precache the app shell so the window opens instantly with no network. */
-const VERSION = 'mv96035w';
+const VERSION = 'mvg3f6yw';
 const CACHE = `ledger-${VERSION}`;
-const PRECACHE = ["/","/index.html","/manifest.webmanifest","/icon-192.png","/icon-512.png","/assets/archivo-latin-wght-normal-E0tuGl4L.woff2","/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2","/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2","/assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2","/assets/index-DGNxpZK0.css","/assets/People-DIZ20JZK.js","/assets/Meetings-SBMeol3C.js","/assets/Capture-YQkCnRB2.js","/assets/Review-DaAJrbi1.js","/assets/Outlook-Du4ualiJ.js","/assets/email-BRffpGde.js","/assets/Settings-COAe1A6F.js","/assets/xlsx-p0UhMoGi.js","/assets/fake-B2mMxpkd.js","/assets/webllm-1P2mQHVz.js","/assets/index-BI-C95S3.js","/assets/msg-BqU96mRW.js"];
+const PRECACHE = ["/","/index.html","/manifest.webmanifest","/icon-192.png","/icon-512.png","/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2","/assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2","/assets/archivo-latin-wght-normal-E0tuGl4L.woff2","/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2","/assets/index-Bm8FNXID.css","/assets/People-BKsqeF6v.js","/assets/Meetings-DciPPP2c.js","/assets/Capture-BzgkPWTG.js","/assets/Review-CGIM07JV.js","/assets/Outlook-D9dlYMwA.js","/assets/email-COO4OBlm.js","/assets/Settings-BFzMolHf.js","/assets/xlsx-CGWyGH3Y.js","/assets/fake-DeFH4sXp.js","/assets/webllm-BwS2V8Lc.js","/assets/index-BI-C95S3.js","/assets/msg-D4-nHMVt.js"];
 
 /*
  * A new worker installs but does NOT take over on its own. Taking over mid-session

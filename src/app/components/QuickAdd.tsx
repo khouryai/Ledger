@@ -116,7 +116,8 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
           aria-label="Add an item"
           autoFocus={autoFocus}
           value={text}
-          placeholder={placeholder ?? '@Sam ATS report rev B by fri #BART   (Enter to add, Tab switches I owe / Waiting on)'}
+          placeholder={placeholder ?? 'Add something: @Sam ATS report rev B by fri #BART'}
+          aria-describedby={`qa-hint-${id}`}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -135,8 +136,36 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
           <Icon name="plus" size={14} /> Add
         </button>
       </div>
-      {(parsed || offer?.length) && (
-        <div className="qa-chips" aria-live="polite">
+      {/* Always there, so the page never jumps as the first character is typed: hints
+          when the line is empty, what was read once it is not. */}
+      <div className="qa-chips" aria-live="polite" id={`qa-hint-${id}`}>
+        {!parsed && !offer?.length && (
+          <span className="qa-hints">
+            <span>
+              <b>@</b> person
+            </span>
+            <span>
+              <b>#</b> tag
+            </span>
+            <span>
+              <b>fri</b>, <b>11/14</b>, <b>+3d</b> due
+            </span>
+            <span>
+              <b>since mon</b> asked
+            </span>
+            <span>
+              <b>every week</b> repeats
+            </span>
+            <span>
+              <b>Tab</b> I owe / Waiting on
+            </span>
+            <span>
+              <b>Enter</b> adds
+            </span>
+          </span>
+        )}
+        {(parsed || offer?.length) ? (
+        <>
           {offer?.map((p) => (
             <button key={p.id} type="button" className="chip" onClick={() => insertPerson(p)} title={`Make this about ${p.name}`}>
               <Icon name="user" size={12} /> {p.name}
@@ -196,8 +225,9 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
               ))}
             </>
           )}
-        </div>
-      )}
+        </>
+        ) : null}
+      </div>
     </div>
   );
 }
