@@ -114,7 +114,9 @@ function Storage() {
       .then(setBackups)
       .catch(() => setBackups([]));
   }, [actions, state.lastSavedAt]);
-  const where = state.mode === 'folder' ? `The folder "${state.where}"` : state.mode === 'browser' ? 'This browser (IndexedDB)' : 'Nowhere: nothing is being saved';
+  const where =
+    state.mode === 'cloud' ? `Your account, ${state.where}` : state.mode === 'folder' ? `The folder "${state.where}"` : state.mode === 'browser' ? 'This browser (IndexedDB)' : 'Nowhere: nothing is being saved';
+  const cloud = state.mode === 'cloud';
   return (
     <Section id="s-storage" title="Where your ledger lives">
       <div className="card">
@@ -126,21 +128,36 @@ function Storage() {
               as <span className="mono">ledger.json</span>, with a copy kept each day in <span className="mono">backups</span> for 30 days.
             </span>
           )}
+          {cloud && (
+            <p className="hint mt-1">
+              <Icon name="shield" size={12} /> Encrypted on this device with your passphrase before it is saved, so the server only ever holds scrambled text. The start of each day is kept for
+              30 days. Every device you sign in on sees the same ledger, and changes made on two at once are merged.
+            </p>
+          )}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {state.mode !== 'folder' && (
+          {!cloud && state.mode !== 'folder' && (
             <button type="button" className="btn btn-primary" onClick={() => void actions.moveToFolder().catch((e) => (e as DOMException).name !== 'AbortError' && actions.toast((e as Error).message, 'error'))}>
               Move this ledger into a folder
             </button>
           )}
-          <button type="button" className="btn" onClick={() => void actions.chooseFolder().catch((e) => (e as DOMException).name !== 'AbortError' && actions.toast((e as Error).message, 'error'))}>
-            {state.mode === 'folder' ? 'Open a different folder' : 'Open a folder that has a ledger'}
-          </button>
-          <button type="button" className="btn" onClick={() => downloadFile(`ledger-${state.today}.json`, JSON.stringify(state.doc, null, 1), 'application/json')}>
+          {!cloud && (
+            <button type="button" className="btn" onClick={() => void actions.chooseFolder().catch((e) => (e as DOMException).name !== 'AbortError' && actions.toast((e as Error).message, 'error'))}>
+              {state.mode === 'folder' ? 'Open a different folder' : 'Open a folder that has a ledger'}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              (!cloud || window.confirm('The copy is not encrypted: anyone who opens the file can read it. Keep it somewhere private. Download it?')) &&
+              downloadFile(`ledger-${state.today}.json`, JSON.stringify(state.doc, null, 1), 'application/json')
+            }
+          >
             <Icon name="download" size={14} /> Download a copy
           </button>
           <label className="btn cursor-pointer">
-            Open a ledger file
+            {cloud ? 'Bring in a ledger file' : 'Open a ledger file'}
             <input
               type="file"
               accept=".json,application/json"
@@ -158,10 +175,29 @@ function Storage() {
               }}
             />
           </label>
-          <button type="button" className="btn btn-mini ml-auto self-center" onClick={() => window.confirm('Close this ledger and choose where to keep one? Nothing is deleted.') && void actions.forgetStorage()}>
-            Close this ledger
-          </button>
+          {!cloud && (
+            <button type="button" className="btn btn-mini ml-auto self-center" onClick={() => window.confirm('Close this ledger and choose where to keep one? Nothing is deleted.') && void actions.forgetStorage()}>
+              Close this ledger
+            </button>
+          )}
         </div>
+        {cloud && (
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--line-soft)] pt-4">
+            <button type="button" className="btn" onClick={() => void actions.lock()} data-testid="account-lock">
+              <Icon name="key" size={14} /> Forget the passphrase here
+            </button>
+            <button type="button" className="btn" onClick={() => void actions.signOut(false)} data-testid="account-signout">
+              <Icon name="logout" size={14} /> Sign out
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => window.confirm('Sign out on every device, including this one? Each will need the password and an authenticator code again.') && void actions.signOut(true)}
+            >
+              Sign out everywhere
+            </button>
+          </div>
+        )}
         {backups.length > 0 && (
           <div className="mt-4">
             <span className="field-l">Daily copies</span>

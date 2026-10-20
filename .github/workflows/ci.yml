@@ -23,6 +23,12 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      # The GitHub Pages build too, so the UI tests can drive it under its security
+      # policy. An empty cloud.json is allowed here: the tests use the test server.
+      - name: Hosted build
+        run: npm run build:pages
+        env:
+          LEDGER_ALLOW_EMPTY_CLOUD: '1'
       - name: Install a browser for the UI tests
         run: npx playwright install --with-deps chromium
       - name: UI tests

@@ -21,12 +21,29 @@ export default defineConfig({
     acceptDownloads: true,
     viewport: { width: 1400, height: 900 },
   },
-  webServer: {
-    command: 'node server/serve.mjs 4173',
-    url: 'http://127.0.0.1:4173/index.html',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  webServer: [
+    {
+      command: 'node server/serve.mjs 4173',
+      url: 'http://127.0.0.1:4173/index.html',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    // The hosted build, served the way GitHub Pages serves it: under /Ledger/.
+    // `npm run build:pages` makes site/; the hosted tests skip without it.
+    ...(existsSync('site/index.html')
+      ? [
+          {
+            command: 'node server/serve.mjs 4174',
+            url: 'http://127.0.0.1:4174/Ledger/index.html',
+            env: { LEDGER_ROOT: 'site', LEDGER_PREFIX: '/Ledger' },
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+            stdout: 'pipe' as const,
+            stderr: 'pipe' as const,
+          },
+        ]
+      : []),
+  ],
 });

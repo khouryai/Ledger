@@ -93,7 +93,7 @@ class MsalGraph implements GraphClient {
 
   async signOut() {
     const account = this.pca.getAllAccounts()[0];
-    if (account) await this.pca.logoutPopup({ account, postLogoutRedirectUri: `${location.origin}/auth.html` }).catch(() => undefined);
+    if (account) await this.pca.logoutPopup({ account, postLogoutRedirectUri: authPage() }).catch(() => undefined);
   }
 }
 
@@ -109,7 +109,7 @@ export function graphClient(clientId: string, tenantId: string): Promise<GraphCl
   client = (async () => {
     const { PublicClientApplication } = await import('@azure/msal-browser');
     const pca = await PublicClientApplication.createPublicClientApplication({
-      auth: { clientId, authority: `https://login.microsoftonline.com/${tenantId || 'organizations'}`, redirectUri: `${location.origin}/auth.html` },
+      auth: { clientId, authority: `https://login.microsoftonline.com/${tenantId || 'organizations'}`, redirectUri: authPage() },
       cache: { cacheLocation: 'localStorage' },
     });
     return new MsalGraph(pca);
@@ -118,4 +118,9 @@ export function graphClient(clientId: string, tenantId: string): Promise<GraphCl
     client = null;
   });
   return client;
+}
+
+/** The sign-in return page beside the app: /auth.html on the laptop, /Ledger/auth.html on GitHub Pages. */
+function authPage(): string {
+  return new URL('auth.html', `${location.origin}${location.pathname}`).href;
 }

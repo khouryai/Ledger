@@ -14,7 +14,8 @@ last built.
 npm run typecheck   # strict TypeScript, no emit
 npm test            # the engine, in Node
 npm run build       # typecheck + dist/ + standalone/
-npm run test:ui     # the built app in Chromium; any console error fails a test
+npm run build:pages # the hosted app into site/ (LEDGER_ALLOW_EMPTY_CLOUD=1 if cloud.json is empty)
+npm run test:ui     # both builds in Chromium; any console error fails a test
 ```
 
 ## Architecture
@@ -30,7 +31,22 @@ npm run test:ui     # the built app in Chromium; any console error fails a test
 - `src/graph/` is Outlook. `suggest.ts` is pure and tested; `client.ts` is the only
   file that knows MSAL or Graph URLs.
 - `src/storage/` is copied from P6-KPI (folder, IndexedDB, memory; atomic writes and
-  OneDrive retries). `ledgerStore.ts` is Ledger's file layout and backups.
+  OneDrive retries). `ledgerStore.ts` is Ledger's file layout and backups, and the
+  `DocStore` interface both places a ledger can live implement.
+- `src/cloud/` is the account (docs/CLOUD.md). `api.ts` is the interface;
+  `supabaseApi.ts` is the only file that knows supabase-js; `fakeApi.ts` answers the
+  same from memory for the tests (`?cloud=fake` in a browser); `vault.ts` is the
+  encryption; `cloudStore.ts` saves, and merges with `engine/merge.ts` on a conflict.
+  `supabase/schema.sql` is the database, tested against Postgres in `tests/sql.test.ts`.
+
+## Builds
+
+- `npm run build` makes `dist/` and `standalone/`: the laptop app, no account. Committed.
+- `npm run build:pages` makes `site/` with `cloud.json`: the hosted app, signed in.
+  Never committed; `.github/workflows/pages.yml` publishes it. It refuses to build with
+  an empty `cloud.json` unless `LEDGER_ALLOW_EMPTY_CLOUD=1` (CI and the tests).
+- Paths are relative everywhere (`base: './'`, the manifest, the service worker), so
+  one build works at a site's root and under `/Ledger/`.
 
 ## Rules that are deliberate
 
@@ -49,6 +65,19 @@ npm run test:ui     # the built app in Chromium; any console error fails a test
 - **What is shown before Enter is what is added.** The quick-add chips are the reading
   the item will be made from.
 - **A file that will not read is never overwritten**; the user is offered the backups.
+- **The server never sees the ledger.** It is encrypted in `cloud/vault.ts` before it
+  is sent; the passphrase is not the password and never leaves the device. Nothing may
+  send the plain ledger to Supabase, and nothing may log it.
+- **Permissions are enforced in Postgres, never in the interface.** Every table's
+  policy requires the owner, the second sign-in step (`aal2`) and membership. A change
+  to what an account may do is a change to `schema.sql` and `tests/sql.test.ts`.
+- **A refused UPDATE is not an error** in Postgres: `save_ledger()` checks the row
+  count and raises, and any new write path must too.
+- **Two devices merge; neither overwrites.** A save is against the version read; on a
+  conflict `engine/merge.ts` merges three ways, and histories are unioned.
+- **The hosted page's CSP is the boundary for injected script**: no inline script, no
+  `eval`, connections only to listed hosts. A new outside host is added to `csp()` in
+  `vite.config.ts` deliberately, as narrowly as the host allows.
 - Colours go through the tokens in `src/app/index.css` (shared with cx-portal and
   P6-KPI). No emoji as icons: `src/app/components/icons.tsx`.
 

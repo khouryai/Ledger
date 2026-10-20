@@ -2,6 +2,9 @@
 const VERSION = '__VERSION__';
 const CACHE = `ledger-${VERSION}`;
 const PRECACHE = __PRECACHE__;
+// Where the app lives: the root on the laptop, /Ledger/ on GitHub Pages.
+const SCOPE = new URL(self.registration.scope).pathname;
+const SHELL = new URL('index.html', self.registration.scope).href;
 
 /*
  * A new worker installs but does NOT take over on its own. Taking over mid-session
@@ -29,15 +32,17 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   // Navigations always resolve to the shell so the app opens even when the server is down.
   if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).catch(() => caches.match('/index.html')));
+    event.respondWith(fetch(req).catch(() => caches.match(SHELL)));
     return;
   }
   // index.html and sw.js must never be answered from the cache: they are how a new
   // build announces itself. Everything else under assets/ is content-hashed.
-  if (url.pathname === '/' || url.pathname === '/index.html') {
-    event.respondWith(fetch(req).catch(() => caches.match('/index.html')));
+  if (url.pathname === SCOPE || url.pathname === `${SCOPE}index.html`) {
+    event.respondWith(fetch(req).catch(() => caches.match(SHELL)));
     return;
   }
+  // The ledger never passes through here: it lives on another origin (Supabase),
+  // and only this site's own files are cached.
   event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
     if (res.ok) {
       const copy = res.clone();

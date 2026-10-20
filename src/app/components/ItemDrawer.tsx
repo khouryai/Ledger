@@ -131,7 +131,7 @@ function Body({ item }: { item: Item }) {
             </span>
           </a>
         )}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="drawer-acts mt-3 flex flex-wrap gap-2">
           {isOpen ? (
             <>
               {item.direction === 'wait' && (

@@ -25,7 +25,23 @@ export type LoadResult =
   | { kind: 'ok'; doc: LedgerDoc; text: string; problems: string[] }
   | { kind: 'broken'; text: string; error: string };
 
-export class LedgerStore {
+/** What a save that had to merge with another device's ledger came back with. */
+export type Saved = { doc: LedgerDoc; clashes: number; renumbered: number };
+
+/**
+ * What the app needs of wherever the ledger lives: this folder-backed store, or the
+ * account (cloud/cloudStore.ts). A save may come back with a merged ledger.
+ */
+export interface DocStore {
+  describe(): string;
+  load(): Promise<LoadResult>;
+  save(doc: LedgerDoc, today: string): Promise<Saved | void>;
+  listBackups(): Promise<{ path: string; day: string }[]>;
+  readBackup(path: string): Promise<LedgerDoc>;
+  changedOutside(): Promise<boolean>;
+}
+
+export class LedgerStore implements DocStore {
   /** The text last read or written, to notice a change made from outside. */
   private lastText: string | null = null;
 

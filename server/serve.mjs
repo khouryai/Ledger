@@ -7,7 +7,10 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist');
+// LEDGER_ROOT and LEDGER_PREFIX let the browser tests serve the hosted build the way
+// GitHub Pages does: site/ under /Ledger/.
+const root = process.env.LEDGER_ROOT ? resolve(process.env.LEDGER_ROOT) : resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist');
+const prefix = process.env.LEDGER_PREFIX ?? '';
 const port = Number(process.env.LEDGER_PORT || process.argv[2] || 47810);
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -30,7 +33,11 @@ if (!existsSync(join(root, 'index.html'))) {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
+    if (prefix && !url.pathname.startsWith(prefix)) {
+      res.writeHead(404).end();
+      return;
+    }
+    let path = normalize(decodeURIComponent(url.pathname.slice(prefix.length) || '/')).replace(/^(\.\.[/\\])+/, '');
     let file = join(root, path);
     if (!file.startsWith(root)) {
       res.writeHead(403).end();

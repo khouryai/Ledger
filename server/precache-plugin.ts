@@ -29,8 +29,9 @@ export function precachePlugin(stamp: BuildStamp): Plugin {
       };
       const assets = Object.keys(bundle)
         .filter((f) => !big(f))
-        .map((f) => `/${f}`);
-      const files = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', ...assets];
+        .map((f) => f);
+      // Relative to the worker, so the app works at a site's root and under a path.
+      const files = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', ...assets];
       const version = `${Date.now().toString(36)}`;
       const template = readFileSync(resolve(process.cwd(), 'server/sw.template.js'), 'utf8');
       const source = template.replace('__PRECACHE__', JSON.stringify(files)).replace('__VERSION__', version);

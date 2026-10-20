@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './state';
 import { useHashRoute } from './router';
 import { Layout } from './components/Layout';
 import { Setup } from './screens/Setup';
+import { SignIn } from './screens/SignIn';
 import { Today } from './screens/Today';
 import { Items } from './screens/Items';
 
@@ -24,6 +25,7 @@ function Loading() {
 function Shell() {
   const { state } = useApp();
   const route = useHashRoute();
+  if (state.status === 'signin') return <SignIn />;
   if (state.status !== 'ready') return <Setup />;
   let screen: React.ReactNode;
   switch (route.screen) {

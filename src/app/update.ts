@@ -50,7 +50,7 @@ export function startUpdateWatch(): void {
   };
 
   navigator.serviceWorker
-    .register('/sw.js')
+    .register('sw.js')
     .then((reg) => {
       armWaiting(reg);
       reg.addEventListener('updatefound', () => {

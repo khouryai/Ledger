@@ -17,6 +17,9 @@ exports/
 *.eml
 *.msg
 
+# The hosted app is built by the Pages workflow, never committed.
+/site/
+
 # Playwright's own output.
 /test-results/
 /playwright-report/

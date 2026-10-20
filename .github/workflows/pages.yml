@@ -1,0 +1,68 @@
+name: Publish to GitHub Pages
+
+# The hosted app: the same application as dist/, built with cloud.json so it signs in
+# and keeps the ledger in the account. Published on every push to main once cloud.json
+# names a Supabase project. Nothing but the app's own files is published: the ledger
+# lives in Supabase, encrypted, and never passes through here.
+#
+# One-time setup: repository Settings -> Pages -> Build and deployment -> Source:
+# GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.cloud.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: cloud
+        name: Is there an account to sign in to?
+        run: |
+          if node -e "const c=require('./cloud.json'); process.exit(c.url && c.key ? 0 : 1)"; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::cloud.json has no Supabase project yet, so nothing is published."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.cloud.outputs.ready == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+      - if: steps.cloud.outputs.ready == 'true'
+        run: npm ci
+      - if: steps.cloud.outputs.ready == 'true'
+        run: npm run build:pages
+      - if: steps.cloud.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
+      - if: steps.cloud.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

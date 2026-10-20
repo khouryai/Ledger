@@ -9,6 +9,7 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build && node scripts/build-standalone.mjs",
     "build:web": "tsc --noEmit -p tsconfig.json && vite build",
     "build:standalone": "node scripts/build-standalone.mjs",
+    "build:pages": "tsc --noEmit -p tsconfig.json && LEDGER_HOSTED=1 vite build",
     "serve": "node server/serve.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

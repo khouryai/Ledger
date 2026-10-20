@@ -16,11 +16,15 @@ import { FileSystemAdapter } from '../storage/fileSystemAdapter';
 import { FsaDirectory } from '../storage/fsaDirectory';
 import { IndexedDbAdapter } from '../storage/indexedDbAdapter';
 import { MemoryAdapter } from '../storage/memoryAdapter';
-import { LedgerStore } from '../storage/ledgerStore';
+import { LedgerStore, type DocStore } from '../storage/ledgerStore';
+import { mergeDocs } from '../engine/merge';
+import { cloudWanted, getCloudApi } from '../cloud';
+import { device } from '../cloud/device';
+import { isNetworkError, OFFLINE_NOTE } from '../cloud/cloudStore';
 import { fsaSupported, loadFolderHandle, pickFolder, queryPermission, requestPermission, saveFolderHandle, forgetFolderHandle } from './folder';
 
-export type Mode = 'folder' | 'browser' | 'memory';
-export type Status = 'loading' | 'setup' | 'reconnect' | 'broken' | 'ready';
+export type Mode = 'folder' | 'browser' | 'memory' | 'cloud';
+export type Status = 'loading' | 'setup' | 'reconnect' | 'broken' | 'ready' | 'signin';
 
 export type Toast = { id: number; text: string; kind: 'ok' | 'info' | 'error'; undo?: boolean };
 
@@ -63,7 +67,13 @@ type Actions = {
   reloadFromDisk: () => Promise<void>;
   keepMine: () => Promise<void>;
   replaceDoc: (doc: LedgerDoc, toast: string) => void;
-  store: () => LedgerStore | null;
+  store: () => DocStore | null;
+  /** The account's ledger is open: called by the sign-in screen once every step is done. */
+  openCloud: (store: DocStore, who: string) => Promise<void>;
+  /** Sign out here (or on every device), and forget the key and the copy kept here. */
+  signOut: (everywhere: boolean) => Promise<void>;
+  /** Forget the remembered passphrase here: the next open asks for it. */
+  lock: () => Promise<void>;
   toast: (text: string, kind?: Toast['kind']) => void;
   setUi: (patch: Partial<Ui>) => void;
 };
@@ -86,7 +96,7 @@ function readMode(): Mode | undefined {
 
 function writeMode(m: Mode | undefined) {
   try {
-    if (m && m !== 'memory') localStorage.setItem(MODE_KEY, m);
+    if (m && m !== 'memory' && m !== 'cloud') localStorage.setItem(MODE_KEY, m);
     else localStorage.removeItem(MODE_KEY);
   } catch {
     /* storage blocked: the choice is asked again next time */
@@ -105,12 +115,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     outside: false,
   }));
   const [ui, setUiState] = useState<Ui>({ openItem: null, chase: null, command: false });
-  const storeRef = useRef<LedgerStore | null>(null);
+  const storeRef = useRef<DocStore | null>(null);
   const idbRef = useRef<IndexedDbAdapter | null>(null);
   const handleRef = useRef<FileSystemDirectoryHandle | null>(null);
   const undoRef = useRef<LedgerDoc[]>([]);
   const docRef = useRef(state.doc);
   docRef.current = state.doc;
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [, setUndoTick] = useState(0);
 
   const idb = () => (idbRef.current ??= new IndexedDbAdapter());
@@ -128,7 +140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => setState((s) => (s.toast?.id === id ? { ...s, toast: undefined } : s)), undo ? 7000 : 4000);
   }, []);
 
-  const open = useCallback(async (store: LedgerStore, mode: Mode, where: string) => {
+  const open = useCallback(async (store: DocStore, mode: Mode, where: string) => {
     const r = await store.load();
     storeRef.current = store;
     undoRef.current = [];
@@ -155,6 +167,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       const params = new URLSearchParams(location.search);
+      // A build with an account opens nothing else: the sign-in screen takes it from here.
+      if (cloudWanted()) {
+        if (!cancelled) setState((s) => ({ ...s, status: 'signin', mode: 'cloud' }));
+        return;
+      }
       if (params.has('demo') || params.has('memory')) {
         const store = new LedgerStore(new MemoryAdapter());
         storeRef.current = store;
@@ -199,10 +216,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const doc = docRef.current;
     setState((s) => ({ ...s, saving: true }));
     try {
-      await store.save(doc, toDay(new Date()));
-      setState((s) => ({ ...s, saving: false, dirty: s.doc !== doc, lastSavedAt: new Date().toISOString(), saveError: undefined }));
+      const out = await store.save(doc, toDay(new Date()));
+      const ok = { saving: false, lastSavedAt: new Date().toISOString(), saveError: undefined };
+      if (out) {
+        // The other device had saved: its changes are merged in. Anything typed here
+        // while that happened is merged on top, and saved next.
+        const cur = docRef.current;
+        const next = cur === doc ? out.doc : mergeDocs(doc, cur, out.doc, new Date()).doc;
+        docRef.current = next;
+        // Undo would step back over the other device's changes as well; it starts again.
+        undoRef.current = [];
+        setUndoTick((n) => n + 1);
+        setState((s) => ({ ...s, ...ok, doc: next, dirty: next !== out.doc, problems: s.problems.filter((p) => p !== OFFLINE_NOTE) }));
+        const bits = [out.clashes ? `${out.clashes} ${out.clashes === 1 ? 'change was' : 'changes were'} made on both, and yours kept` : '', out.renumbered ? `${out.renumbered} new ${out.renumbered === 1 ? 'item was' : 'items were'} renumbered` : '']
+          .filter(Boolean)
+          .join('; ');
+        toast(`Brought in what changed on your other device${bits ? `: ${bits}` : ''}.`, 'info');
+      } else setState((s) => ({ ...s, ...ok, dirty: s.doc !== doc, problems: s.problems.filter((p) => p !== OFFLINE_NOTE) }));
     } catch (err) {
-      setState((s) => ({ ...s, saving: false, saveError: (err as Error).message }));
+      const msg = isNetworkError(err) ? 'No connection. Your changes are kept here and saved when it is back.' : (err as Error).message;
+      setState((s) => ({ ...s, saving: false, saveError: msg }));
     } finally {
       savingRef.current = false;
     }
@@ -213,6 +246,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const t = window.setTimeout(() => void save(), SAVE_DELAY);
     return () => window.clearTimeout(t);
   }, [state.status, state.dirty, state.saving, state.doc, state.outside, save]);
+
+  // A save that failed (no signal) is tried again when the connection is back, and
+  // every half minute meanwhile.
+  useEffect(() => {
+    if (state.status !== 'ready' || !state.dirty || !state.saveError || state.saving) return;
+    const retry = () => void save();
+    const t = window.setTimeout(retry, 30_000);
+    window.addEventListener('online', retry);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('online', retry);
+    };
+  }, [state.status, state.dirty, state.saveError, state.saving, save]);
 
   // Unsaved work is never lost to a closed window without a warning.
   useEffect(() => {
@@ -235,6 +281,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!store || state.status !== 'ready' || state.mode === 'memory') return;
       try {
         if (!(await store.changedOutside())) return;
+        if (state.mode === 'cloud') {
+          // The other device saved. With nothing unsaved here, show its ledger; with
+          // something unsaved, saving merges the two.
+          if (state.dirty) {
+            void save();
+            return;
+          }
+          const r = await store.load();
+          if (r.kind === 'ok' && docRef.current === state.doc) {
+            undoRef.current = [];
+            docRef.current = r.doc;
+            setState((s) => ({ ...s, doc: r.doc, problems: r.problems }));
+          }
+          return;
+        }
         if (!state.dirty) {
           const r = await store.load();
           if (r.kind === 'ok') {
@@ -247,13 +308,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         /* a folder that cannot be read right now is reported on the next save */
       }
     };
-    const id = window.setInterval(tick, 60_000);
+    // A phone rarely fires focus: coming back to the app is a visibility change. The
+    // account is also checked every minute while the app is on screen.
+    const onShow = () => document.visibilityState === 'visible' && void onFocus();
+    const id = window.setInterval(() => {
+      tick();
+      if (state.mode === 'cloud' && document.visibilityState === 'visible') void onFocus();
+    }, 60_000);
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onShow);
     return () => {
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onShow);
     };
-  }, [state.status, state.mode, state.dirty, toast]);
+  }, [state.status, state.mode, state.dirty, state.doc, save, toast]);
+
+  // Signed out somewhere else (Sign out everywhere, a password change): back to sign-in.
+  useEffect(() => {
+    if (state.mode !== 'cloud' || state.status !== 'ready') return;
+    let off: (() => void) | undefined;
+    let live = true;
+    void getCloudApi().then((api) => {
+      if (!live) return;
+      off = api.onChange(() => {
+        void api.state().then((st) => {
+          if (st.kind !== 'ready') {
+            storeRef.current = null;
+            undoRef.current = [];
+            setState((s) => ({ ...s, status: 'signin', doc: emptyDoc(), dirty: false, problems: [] }));
+          }
+        });
+      });
+    });
+    return () => {
+      live = false;
+      off?.();
+    };
+  }, [state.mode, state.status]);
 
   const apply = useCallback(
     (op: (doc: LedgerDoc) => LedgerDoc, message?: string | (() => string)) => {
@@ -357,6 +449,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         toast(message, 'ok', true);
       },
       store: () => storeRef.current,
+      openCloud: async (store: DocStore, who: string) => {
+        await open(store, 'cloud', who);
+      },
+      signOut: async (everywhere: boolean) => {
+        if (stateRef.current.dirty && !window.confirm('Some changes have not reached your account yet, and signing out loses them. Sign out anyway?')) return;
+        const api = await getCloudApi();
+        await api.signOut(everywhere).catch(() => undefined);
+        await device.clear();
+        storeRef.current = null;
+        undoRef.current = [];
+        setState((s) => ({ ...s, status: 'signin', doc: emptyDoc(), dirty: false, problems: [], saveError: undefined }));
+      },
+      lock: async () => {
+        if (stateRef.current.dirty) await save();
+        await device.clear();
+        storeRef.current = null;
+        undoRef.current = [];
+        setState((s) => ({ ...s, status: 'signin', doc: emptyDoc(), dirty: false, problems: [] }));
+      },
       toast: (text: string, kind?: Toast['kind']) => toast(text, kind),
       setUi: (patch: Partial<Ui>) => setUiState((u) => ({ ...u, ...patch })),
     }),

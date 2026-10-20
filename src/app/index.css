@@ -1263,3 +1263,121 @@ section + section, .card + section, .notice + section { margin-top: 28px; }
 .toc button.is-on { color: var(--text); font-weight: 600; border-left-color: var(--hitachi-red); border-radius: 0 6px 6px 0; }
 .toc button:focus-visible { outline: none; box-shadow: var(--ring); }
 section[id^='s-'] { scroll-margin-top: 16px; }
+
+/* Signing in: one narrow card, three steps. */
+.auth-card { width: min(440px, 100%); background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 28px 28px 20px; }
+.auth-brand { font-family: var(--f-display); font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.auth-steps { list-style: none; display: flex; gap: 6px; margin: 22px 0 0; padding: 0; }
+.auth-steps li { flex: 1; display: flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); padding-top: 8px; border-top: 2px solid var(--gray-200); }
+.auth-steps li.is-on { color: var(--text); border-top-color: var(--hitachi-red); }
+.auth-steps li.is-done { color: var(--good); border-top-color: var(--good); }
+.auth-step-n { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--gray-200); color: var(--text-muted); font-size: 9px; }
+.auth-steps li.is-on .auth-step-n { background: var(--hitachi-red); color: var(--white); }
+.auth-steps li.is-done .auth-step-n { background: var(--good); color: var(--white); }
+.auth-title { font-family: var(--f-display); font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin: 0; }
+.auth-sub { font-size: 13px; color: var(--text-muted); margin: 4px 0 16px; line-height: 1.5; }
+.auth-go { width: 100%; justify-content: center; min-height: 44px; margin-top: 4px; }
+.auth-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 14px; font-size: 12.5px; }
+.auth-foot { display: flex; gap: 8px; align-items: flex-start; margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 11.5px; line-height: 1.5; color: var(--text-subtle); }
+.auth-foot svg { flex: none; margin-top: 2px; color: var(--good); }
+.auth-code { font-family: var(--f-mono); font-size: 22px; letter-spacing: 0.35em; text-align: center; min-height: 48px; }
+.auth-howto { list-style: decimal; margin: 0 0 12px; padding-left: 18px; font-size: 13px; color: var(--text-muted); }
+.auth-qr { display: grid; place-items: center; padding: 12px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--white); margin-bottom: 10px; }
+.auth-secret { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.auth-secret summary { cursor: pointer; }
+.auth-secret code { display: block; margin-top: 6px; font-family: var(--f-mono); font-size: 13px; color: var(--text); background: var(--surface-2); border-radius: 6px; padding: 8px 10px; word-break: break-all; user-select: all; }
+.auth-check { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); margin: 4px 0 12px; cursor: pointer; }
+.auth-check input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--hitachi-red); flex: none; }
+.auth-check b { color: var(--text); }
+.secret { position: relative; display: block; }
+.secret .input { padding-right: 42px; }
+.secret-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 6px; color: var(--text-subtle); background: none; border: 0; cursor: pointer; }
+.secret-eye:hover { color: var(--text); background: var(--surface-2); }
+.secret-eye:focus-visible { outline: none; box-shadow: var(--ring); }
+@media (max-width: 520px) {
+  .setup:has(.auth-card) { padding: 0; place-items: stretch; background: var(--surface); }
+  .auth-card { border: 0; border-radius: 0; box-shadow: none; padding: max(24px, env(safe-area-inset-top)) 20px 24px; min-height: 100dvh; }
+  .auth-card .input { font-size: 16px; }
+}
+
+/* The shell fills the window, and on a phone the dynamic viewport (the address bar comes and goes). */
+.app-shell { height: 100vh; height: 100dvh; }
+.tabbar, .menu-scrim { display: none; }
+
+/* A phone: the menu becomes a tab bar along the bottom, with the rest one tap away. */
+@media (max-width: 760px) {
+  .app-shell > .sidenav {
+    position: fixed; z-index: 45; top: 0; bottom: 0; left: 0; width: min(300px, 84vw);
+    transform: translateX(-100%); transition: transform var(--dur) var(--easing);
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+  }
+  .app-shell.menu-open > .sidenav { transform: none; box-shadow: var(--shadow-lg); }
+  .menu-scrim { display: block; position: fixed; inset: 0; z-index: 44; background: rgba(10, 10, 12, 0.32); animation: fade var(--dur) var(--easing); }
+  .sidenav .nav-link { min-height: 44px; }
+  .sidenav-foot .foot-btn { display: none; }
+
+  .tabbar {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--surface); border-top: 1px solid var(--line-soft);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar a, .tabbar button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px;
+    font-family: var(--f-ui); font-size: 10.5px; font-weight: 600; color: var(--text-subtle); text-decoration: none;
+    background: none; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .tabbar .is-on { color: var(--hitachi-red); }
+  .tabbar a:focus-visible, .tabbar button:focus-visible { outline: none; box-shadow: inset var(--ring); }
+  .tab-ico { position: relative; display: grid; place-items: center; }
+  .tab-badge { position: absolute; top: -5px; left: 13px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--hitachi-red); color: var(--white); font-family: var(--f-mono); font-size: 9.5px; line-height: 16px; text-align: center; }
+  .tab-dot { min-width: 8px; width: 8px; height: 8px; padding: 0; top: -2px; left: 16px; }
+
+  /* The add line: the hints are a laptop's; on a phone the chips still show what was read. */
+  .qa { padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); gap: 8px; }
+  .qa-hints { display: none; }
+  .qa-dir { padding: 0 10px; min-height: 40px; font-size: 9.5px; flex: none; }
+  .qa-input { min-width: 0; min-height: 40px; padding: 0 12px; }
+  .qa-add { width: 44px; min-height: 40px; padding: 0; justify-content: center; flex: none; }
+  .qa-add-l { display: none; }
+  .ph-sub { display: none; }
+  .page-hero .ph-stat { padding: 4px 10px; }
+  .drawer-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+  .drawer-acts .btn { justify-content: center; padding: 0 6px; font-size: 13px; }
+  .qa-chips { min-height: 0; padding: 0 12px 6px; }
+  .qa-chips:empty, .qa-chips:not(:has(*:not(.qa-hints))) { display: none; }
+
+  /* Sixteen pixels stops iOS zooming into a field it focuses. */
+  .input, .textarea, select.input, .qa-input, .title-edit { font-size: 16px; }
+
+  .page { padding: 14px 14px 28px; }
+  .page-hero { padding: 16px 14px 14px; flex-direction: column; gap: 10px; }
+  .ph-title { font-size: 22px; }
+  .ph-actions { width: 100%; }
+
+  /* Rows: the actions are always there and big enough for a thumb. */
+  .row { padding: 12px 10px 12px 12px; gap: 10px; }
+  .row-acts { opacity: 1; gap: 0; }
+  .row-acts .ico-btn { width: 40px; height: 40px; }
+  .row-num { display: none; }
+  .row-meta { gap: 4px 8px; }
+
+  /* An item fills the screen, its header and actions staying in reach. */
+  .drawer { width: 100vw; border-left: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); animation: slide-up var(--dur) var(--easing); }
+  .drawer-h { padding: 12px 14px 10px; }
+  .drawer-b { padding: 14px 14px 32px; }
+  .drawer-h .btn { min-height: 40px; }
+  .grid2 { grid-template-columns: 1fr; }
+
+  .modal-scrim { padding: 0; place-items: end stretch; }
+  .modal { width: 100%; border-radius: 14px 14px 0 0; max-height: 92dvh; overflow: auto; padding-bottom: env(safe-area-inset-bottom); }
+
+  .people { grid-template-columns: 1fr; }
+  .settings-page { gap: 0; }
+  .toast { left: 12px; right: 12px; bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .strip { padding-left: 14px; padding-right: 14px; font-size: 12px; }
+  .strip .btn-mini { flex: none; }
+  .sugg-fields { grid-template-columns: 1fr; }
+  .sugg-src { grid-column: auto; padding-top: 6px; }
+  .skip-link { display: none; }
+}
+@keyframes slide-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }

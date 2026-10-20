@@ -47,6 +47,9 @@ export function Layout({ screen, children }: { screen: string; children: React.R
   ];
 
   const [help, setHelp] = useState(false);
+  // On a phone the screens are a tab bar, and the rest of the menu slides over.
+  const [menu, setMenu] = useState(false);
+  useEffect(() => setMenu(false), [screen]);
   const mainRef = useRef<HTMLDivElement>(null);
 
   // A new screen starts at its top, and a screen chosen from the menu takes the focus,
@@ -83,14 +86,27 @@ export function Layout({ screen, children }: { screen: string; children: React.R
     return () => window.removeEventListener('keydown', onKey);
   }, [actions, ui.command, ui.openItem, ui.chase]);
 
-  const where = state.mode === 'folder' ? state.where : state.mode === 'browser' ? 'This browser' : 'Not saving';
+  const where = state.mode === 'folder' || state.mode === 'cloud' ? state.where : state.mode === 'browser' ? 'This browser' : 'Not saving';
+  const saved = state.saving
+    ? 'Saving…'
+    : state.dirty && state.mode !== 'memory'
+      ? state.saveError
+        ? 'Not saved yet'
+        : 'Saving shortly'
+      : state.mode === 'memory'
+        ? 'Nothing is saved'
+        : state.lastSavedAt
+          ? `Saved ${fmtSaved(state.lastSavedAt)}`
+          : 'Saved';
+  const tabs: NavItem[] = [nav[0].items[0], nav[0].items[1], nav[0].items[2], nav[0].items[3]];
 
   return (
-    <div className="flex h-screen">
+    <div className={`app-shell flex${menu ? ' menu-open' : ''}`}>
       <button type="button" className="skip-link" onClick={() => mainRef.current?.focus()}>
         Skip to the content
       </button>
-      <aside className="sidenav flex w-56 shrink-0 flex-col">
+      {menu && <div className="menu-scrim" onClick={() => setMenu(false)} aria-hidden="true" />}
+      <aside className="sidenav flex w-56 shrink-0 flex-col" aria-label="Menu">
         <div className="sidenav-brand flex items-center gap-3">
           <LogoMark size={30} />
           <div>
@@ -132,7 +148,7 @@ export function Layout({ screen, children }: { screen: string; children: React.R
             {where}
           </div>
           <div className="mt-0.5 opacity-70" data-testid="save-state">
-            {state.saving ? 'Saving…' : state.dirty && state.mode !== 'memory' ? 'Saving shortly' : state.mode === 'memory' ? 'Nothing is saved' : state.lastSavedAt ? `Saved ${fmtSaved(state.lastSavedAt)}` : 'Saved'}
+            {saved}
           </div>
           <div className="mt-1 truncate opacity-60" title={`Build ${BUILD_COMMIT}${BUILD_TIME ? ` built ${fmtDateTime(BUILD_TIME)}` : ''}`}>
             {buildLabel()}
@@ -145,7 +161,8 @@ export function Layout({ screen, children }: { screen: string; children: React.R
         {state.saveError && (
           <div className="strip strip-error flex items-center justify-between gap-3">
             <span>
-              <b>Could not save.</b> {state.saveError} Your changes are still here.
+              <b>Not saved yet.</b> {state.saveError}
+              {/kept here/.test(state.saveError) ? '' : ' Your changes are still here.'}
             </span>
             <button type="button" className="btn btn-mini" onClick={() => void actions.saveNow()}>
               Try again
@@ -214,6 +231,24 @@ export function Layout({ screen, children }: { screen: string; children: React.R
             )}
           </div>
         )}
+        <nav className="tabbar" aria-label="Screens">
+          {tabs.map((n) => (
+            <a key={n.id} href={href(n.id)} className={screen === n.id ? 'is-on' : ''} aria-current={screen === n.id ? 'page' : undefined}>
+              <span className="tab-ico">
+                <Icon name={n.icon} size={20} />
+                {n.count && n.hot ? <span className="tab-badge">{n.count}</span> : null}
+              </span>
+              {n.label}
+            </a>
+          ))}
+          <button type="button" className={menu ? 'is-on' : ''} onClick={() => setMenu((m) => !m)} aria-expanded={menu} data-testid="tab-more">
+            <span className="tab-ico">
+              <Icon name="list" size={20} />
+              {nav[1].items[0].hot ? <span className="tab-badge tab-dot" /> : null}
+            </span>
+            More
+          </button>
+        </nav>
       </main>
       <ItemDrawer />
       <ChaseDialog />

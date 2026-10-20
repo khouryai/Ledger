@@ -25,7 +25,21 @@ type Props = {
   autoFocus?: boolean;
 };
 
+/** True on a phone-sized window, kept up to date as it turns or resizes. */
+export function useNarrow(width = 760): boolean {
+  const q = `(max-width: ${width}px)`;
+  const [n, setN] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(q).matches);
+  useEffect(() => {
+    const m = matchMedia(q);
+    const on = () => setN(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [q]);
+  return n;
+}
+
 export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, autoFocus }: Props) {
+  const narrow = useNarrow();
   const { state, actions } = useApp();
   const doc = state.doc;
   const [text, setText] = useState('');
@@ -107,7 +121,7 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
           title="Switch between I owe and Waiting on (Tab while typing)"
           data-testid={`qa-dir-${id}`}
         >
-          {(parsed?.direction ?? direction) === 'owe' ? 'I owe' : 'Waiting on'}
+          {(parsed?.direction ?? direction) === 'owe' ? 'I owe' : narrow ? 'Waiting' : 'Waiting on'}
         </button>
         <input
           ref={ref}
@@ -116,7 +130,7 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
           aria-label="Add an item"
           autoFocus={autoFocus}
           value={text}
-          placeholder={placeholder ?? 'Add something: @Sam ATS report rev B by fri #BART'}
+          placeholder={placeholder ?? (narrow ? '@Sam ATS report by fri' : 'Add something: @Sam ATS report rev B by fri #BART')}
           aria-describedby={`qa-hint-${id}`}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -132,8 +146,8 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
             }
           }}
         />
-        <button type="button" className="btn btn-primary" onClick={submit} disabled={!parsed?.title}>
-          <Icon name="plus" size={14} /> Add
+        <button type="button" className="btn btn-primary qa-add" onClick={submit} disabled={!parsed?.title} aria-label="Add">
+          <Icon name="plus" size={14} /> <span className="qa-add-l">Add</span>
         </button>
       </div>
       {/* Always there, so the page never jumps as the first character is typed: hints

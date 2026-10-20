@@ -12,6 +12,10 @@ everything people owe you, with the chasing worked out for you.
   writes up your week. Nothing it reads leaves the machine. With it off, rules do
   the same jobs.
 - Shares its look with cx-portal and P6-KPI: the same token sheet and typefaces.
+- **Or on every device**: the hosted build on GitHub Pages keeps the ledger in your
+  own Supabase account, **encrypted on the device** with a passphrase only you know,
+  behind a password and an authenticator code. Installs as an app on the laptop and
+  on a phone's home screen. See [docs/CLOUD.md](docs/CLOUD.md).
 
 ## Running it
 
