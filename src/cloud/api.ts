@@ -73,7 +73,9 @@ export function friendly(err: unknown): string {
   if (/invalid login credentials/i.test(m)) return 'That email and password do not match.';
   if (/email not confirmed/i.test(m)) return 'Confirm your email first: open the link Supabase sent you.';
   if (/invalid totp|invalid mfa|code.*(invalid|expired)/i.test(m)) return 'That code is not right. Codes change every 30 seconds; use the current one.';
-  if (/invitation only|not allowed|signups not allowed/i.test(m)) return 'This address cannot have an account here.';
+  // The database's invitation trigger refusing a sign-up reaches the app as Supabase's
+  // generic wrapper, so both are read as the same answer.
+  if (/invitation only|not allowed|signups not allowed|database error saving new user/i.test(m)) return 'This address cannot have an account here.';
   if (/rate limit|too many/i.test(m)) return 'Too many tries. Wait a minute, then try again.';
   if (/failed to fetch|network/i.test(m)) return 'No connection. Check the network and try again.';
   return m;

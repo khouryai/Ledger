@@ -127,6 +127,16 @@ describe('the database', () => {
     await expect(as(null, `select public.save_ledger(0, 'a', 'b', 'c', current_date)`)).rejects.toThrow(/permission denied/);
   });
 
+  it('exposes no SECURITY DEFINER function to the API', async () => {
+    // Everything in public is callable as /rest/v1/rpc/<name>; a definer function
+    // there runs with the owner's rights on whatever a caller passes it.
+    const rows = await db.query<{ name: string }>(`
+      select p.proname as name from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prosecdef
+        and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))`);
+    expect(rows.rows).toEqual([]);
+  });
+
   it('cuts off a member who is removed, at once', async () => {
     await db.exec(`delete from public.ledger_members where email = 'me@example.com'`);
     expect(await as(me, 'select * from public.ledgers')).toHaveLength(0);

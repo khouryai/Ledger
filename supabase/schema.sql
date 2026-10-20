@@ -51,8 +51,14 @@ create trigger ledger_gate before insert on auth.users
   for each row execute function public.ledger_gate();
 
 -- Whether the caller may touch their own rows at all: a member, past the second step.
--- SECURITY DEFINER so it can read ledger_members, which no caller can.
-create or replace function public.ledger_may() returns boolean
+-- SECURITY DEFINER so it can read ledger_members, which no caller can. It lives in a
+-- schema the API does not expose, so policies can call it but nobody can call it as
+-- /rest/v1/rpc/... (Supabase's advisor flags a definer function that can be).
+create schema if not exists ledger_private;
+revoke all on schema ledger_private from public, anon;
+grant usage on schema ledger_private to authenticated;
+
+create or replace function ledger_private.may() returns boolean
 language sql stable security definer set search_path = '' as $$
   select coalesce((select auth.jwt() ->> 'aal'), '') = 'aal2'
      and exists (
@@ -60,8 +66,8 @@ language sql stable security definer set search_path = '' as $$
        where m.email = lower(btrim(coalesce((select auth.jwt() ->> 'email'), '')))
      );
 $$;
-revoke all on function public.ledger_may() from public, anon;
-grant execute on function public.ledger_may() to authenticated;
+revoke all on function ledger_private.may() from public, anon;
+grant execute on function ledger_private.may() to authenticated;
 
 -- The vault: how to derive the key, never the key -------------------------------
 
@@ -79,10 +85,10 @@ grant select, insert on public.ledger_vaults to authenticated;
 
 drop policy if exists "own vault: read" on public.ledger_vaults;
 create policy "own vault: read" on public.ledger_vaults for select to authenticated
-  using (user_id = (select auth.uid()) and (select public.ledger_may()));
+  using (user_id = (select auth.uid()) and (select ledger_private.may()));
 drop policy if exists "own vault: create once" on public.ledger_vaults;
 create policy "own vault: create once" on public.ledger_vaults for insert to authenticated
-  with check (user_id = (select auth.uid()) and (select public.ledger_may()));
+  with check (user_id = (select auth.uid()) and (select ledger_private.may()));
 -- No update and no delete: changing the passphrase would strand every backup sealed
 -- under the old key. A new passphrase is a new account's worth of setting up.
 
@@ -102,14 +108,14 @@ grant select, insert, update on public.ledgers to authenticated;
 
 drop policy if exists "own ledger: read" on public.ledgers;
 create policy "own ledger: read" on public.ledgers for select to authenticated
-  using (user_id = (select auth.uid()) and (select public.ledger_may()));
+  using (user_id = (select auth.uid()) and (select ledger_private.may()));
 drop policy if exists "own ledger: create" on public.ledgers;
 create policy "own ledger: create" on public.ledgers for insert to authenticated
-  with check (user_id = (select auth.uid()) and (select public.ledger_may()));
+  with check (user_id = (select auth.uid()) and (select ledger_private.may()));
 drop policy if exists "own ledger: save" on public.ledgers;
 create policy "own ledger: save" on public.ledgers for update to authenticated
-  using (user_id = (select auth.uid()) and (select public.ledger_may()))
-  with check (user_id = (select auth.uid()) and (select public.ledger_may()));
+  using (user_id = (select auth.uid()) and (select ledger_private.may()))
+  with check (user_id = (select auth.uid()) and (select ledger_private.may()));
 
 -- Backups: the start of each day, kept 30 days ---------------------------------------
 
@@ -128,13 +134,13 @@ grant select, insert, delete on public.ledger_backups to authenticated;
 
 drop policy if exists "own backups: read" on public.ledger_backups;
 create policy "own backups: read" on public.ledger_backups for select to authenticated
-  using (user_id = (select auth.uid()) and (select public.ledger_may()));
+  using (user_id = (select auth.uid()) and (select ledger_private.may()));
 drop policy if exists "own backups: keep" on public.ledger_backups;
 create policy "own backups: keep" on public.ledger_backups for insert to authenticated
-  with check (user_id = (select auth.uid()) and (select public.ledger_may()));
+  with check (user_id = (select auth.uid()) and (select ledger_private.may()));
 drop policy if exists "own backups: prune" on public.ledger_backups;
 create policy "own backups: prune" on public.ledger_backups for delete to authenticated
-  using (user_id = (select auth.uid()) and (select public.ledger_may()));
+  using (user_id = (select auth.uid()) and (select ledger_private.may()));
 
 -- Saving --------------------------------------------------------------------------------
 --
@@ -154,7 +160,7 @@ begin
   if uid is null then
     raise exception 'Not signed in.' using errcode = '28000';
   end if;
-  if not (select public.ledger_may()) then
+  if not (select ledger_private.may()) then
     raise exception 'The authenticator code is needed before saving.' using errcode = '42501';
   end if;
   if p_day < current_date - 2 or p_day > current_date + 2 then
@@ -198,3 +204,6 @@ grant execute on function public.save_ledger(bigint, text, text, text, date) to 
 
 -- The one address allowed in. Run this once, with yours, in the SQL editor:
 --   insert into public.ledger_members (email) values ('you@example.com') on conflict do nothing;
+
+-- An earlier version kept the check above in public, where the API could reach it.
+drop function if exists public.ledger_may();
