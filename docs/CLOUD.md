@@ -12,6 +12,10 @@ Ledger runs two ways, and they are the same application:
 The hosted build is the laptop build plus `cloud.json` (which Supabase project to use).
 `npm run build:pages` makes it in `site/`; `.github/workflows/pages.yml` publishes it.
 
+**This repository's deployment:** the app is at `https://khouryai.github.io/Ledger/`
+and its database is the Supabase project `ledger` (`kjjncbvvmdpwvkdqftbd`, us-west-1)
+in the organisation Alex's.
+
 ## What protects the ledger
 
 Three layers, each enough on its own to stop someone who got past the one before.
@@ -63,7 +67,9 @@ copy** saves a plain (unencrypted) copy whenever you want one.
 ### 1. The Supabase project
 
 Create a project (a separate one: the invitation trigger applies to the whole project's
-sign-ups). Then, in its **SQL editor**:
+sign-ups). Then, in its **SQL editor** (not through an AI tool's migration call: those
+hold any statement containing `drop` or `delete` for a confirmation, and the script has
+both):
 
 1. Run all of `supabase/schema.sql`.
 2. Add your address, the only one allowed an account:
