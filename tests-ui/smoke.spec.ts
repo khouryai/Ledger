@@ -217,7 +217,7 @@ test('Outlook suggests sent emails nobody answered, from a fake mailbox', async 
   await page.getByTestId('outlook-check').click();
   await expect(page.getByTestId('suggestion')).toHaveCount(1);
   await expect(page.getByTestId('suggestion')).toContainText('no reply');
-  await expect(page.getByTestId('suggestion').locator('input[aria-label="Title"]')).toHaveValue('Send the radio coverage plot for the tunnel');
+  await expect(page.getByTestId('suggestion').locator('[aria-label="Title"]')).toHaveValue('Send the radio coverage plot for the tunnel');
   await page.getByTestId('add-suggestions').click();
   await expect(page.locator('.toast')).toContainText('Added 1 item');
   // Checked again, the same email is not suggested twice.
@@ -252,6 +252,24 @@ test('every screen renders without an error', async ({ page }) => {
     await page.goto(`/?demo=1#/${s}`);
     await expect(page.locator('.ph-title')).toBeVisible();
   }
+  expect(errors).toEqual([]);
+});
+
+test("a long title and long notes are shown whole, never scrolled inside their box", async ({ page }) => {
+  const errors = watch(page);
+  await demo(page, 'wait');
+  await page.locator('.row', { hasText: 'Cable schedule' }).click();
+  const long = 'Cable schedule for HTT interlocking, with the corrections from the October site walk and the radio survey cross-references for sections 4 and 7';
+  await page.getByTestId('item-title').fill(long);
+  await page.getByTestId('item-title').press('Enter');
+  await expect(page.locator('.row', { hasText: 'radio survey cross-references' })).toHaveCount(1);
+  const notes = page.getByRole('textbox', { name: 'Notes' });
+  await notes.fill(['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'].map((w) => `${w}: a line of the note`).join('\n'));
+  for (const box of [page.getByTestId('item-title'), notes]) {
+    const { scroll, client } = await box.evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
+    expect(scroll).toBeLessThanOrEqual(client + 1);
+  }
+  expect(await page.getByTestId('item-title').inputValue()).toBe(long);
   expect(errors).toEqual([]);
 });
 
@@ -292,6 +310,6 @@ test('an Outlook .msg file dropped into Capture is read', async ({ page }) => {
   await expect(page.locator('.card-title')).toContainText('RE: Radio survey');
   await expect(page.locator('main')).toContainText('From Dev Patel');
   await page.getByTestId('capture-rules').click();
-  await expect(page.getByTestId('suggestion').locator('input[aria-label="Title"]')).toHaveValue('Send the tunnel drawings');
+  await expect(page.getByTestId('suggestion').locator('[aria-label="Title"]')).toHaveValue('Send the tunnel drawings');
   expect(errors).toEqual([]);
 });

@@ -393,7 +393,10 @@ function AiSettings() {
                     <input type="radio" name="model" className="mt-1" checked={s.ai.model === x.id} onChange={() => set({ model: x.id })} />
                     <span>
                       <span className="opt-t">
-                        {x.label} <span className="hint font-normal">· {x.maker} · needs about {(x.vramMB / 1024).toFixed(1)} GB of graphics memory</span>
+                        {x.label}{' '}
+                        <span className="hint font-normal">
+                          · {x.maker} · a {(x.downloadMB / 1024).toFixed(1)} GB download, then about {(x.vramMB / 1024).toFixed(1)} GB of graphics memory
+                        </span>
                       </span>
                       <span className="opt-d block">{x.note}</span>
                     </span>
@@ -467,7 +470,31 @@ function AiSettings() {
               )}
               {status.state === 'ready' && <span className="badge badge-good">Ready: {modelChoice(status.model).label}</span>}
               {status.state === 'unsupported' && <span className="notice notice-warn block">{status.reason}</span>}
-              {status.state === 'error' && <span className="notice notice-error block">{status.message}</span>}
+              {status.state === 'error' && (
+                <div className="notice notice-error block" data-testid="ai-error">
+                  <div>{status.message}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-mini"
+                      onClick={async () => {
+                        const w = await import('../../ai/webllm');
+                        await w.removeDownload(s.ai.model);
+                        setDownloaded(false);
+                        void getEngine(s.ai.model).catch(() => undefined);
+                      }}
+                    >
+                      Clear what was downloaded and try again
+                    </button>
+                  </div>
+                  {status.detail && (
+                    <details className="mt-2 text-[11.5px]">
+                      <summary className="cursor-pointer">What the browser said</summary>
+                      <pre className="mono mt-1 whitespace-pre-wrap break-all">{status.detail}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
             </div>
             {gpu && <div className="hint mt-2">{gpu}</div>}
             {test && <div className="notice notice-info mt-2">{test}</div>}

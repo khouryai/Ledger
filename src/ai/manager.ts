@@ -16,7 +16,7 @@ export type AiStatus =
   | { state: 'unsupported'; reason: string }
   | { state: 'loading'; model: string; progress: number; text: string }
   | { state: 'ready'; model: string }
-  | { state: 'error'; model: string; message: string };
+  | { state: 'error'; model: string; message: string; detail?: string };
 
 let status: AiStatus = { state: 'idle' };
 let engine: AiEngine | null = null;
@@ -77,7 +77,10 @@ export async function getEngine(model: string): Promise<AiEngine> {
       set({ state: 'ready', model });
       return e;
     } catch (err) {
-      if (status.state !== 'unsupported') set({ state: 'error', model, message: (err as Error).message });
+      if (status.state !== 'unsupported') {
+        const problem = (err as { problem?: { message: string; detail: string } }).problem;
+        set({ state: 'error', model, message: problem?.message ?? (err as Error).message, detail: problem?.detail });
+      }
       throw err;
     } finally {
       loading = null;

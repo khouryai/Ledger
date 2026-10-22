@@ -254,7 +254,7 @@ function PersonCard({ person }: { person: Person }) {
           </div>
           <label className="field block">
             <span className="field-l">Notes</span>
-            <CommitInput multiline className="textarea" value={person.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || undefined })} />
+            <CommitInput multiline grow className="textarea notes-ta" value={person.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || undefined })} />
           </label>
         </div>
       </details>

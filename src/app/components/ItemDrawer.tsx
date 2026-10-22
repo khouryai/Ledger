@@ -120,7 +120,7 @@ function Body({ item }: { item: Item }) {
           <IconButton icon="x" label="Close (Esc)" onClick={() => actions.setUi({ openItem: null })} />
         </div>
         <div className="mt-2">
-          <CommitInput className="title-edit" value={item.title} onCommit={(v) => v.trim() && patch({ title: v.trim() })} ariaLabel="Title" testid="item-title" />
+          <CommitInput grow className="title-edit" value={item.title} onCommit={(v) => v.trim() && patch({ title: v.trim() })} ariaLabel="Title" testid="item-title" />
         </div>
         {person && (
           <a className="drawer-person" href={href('people', { id: person.id })} onClick={() => actions.setUi({ openItem: null })}>
@@ -366,7 +366,7 @@ function Body({ item }: { item: Item }) {
               }
             }}
           />
-          <CommitInput multiline className="textarea notes-ta" value={item.notes ?? ''} placeholder="Notes worth keeping with it" ariaLabel="Notes" onCommit={(v) => patch({ notes: v.trim() || undefined })} />
+          <CommitInput multiline grow className="textarea notes-ta" value={item.notes ?? ''} placeholder="Notes worth keeping with it" ariaLabel="Notes" onCommit={(v) => patch({ notes: v.trim() || undefined })} />
         </section>
 
         <section className="d-sec" aria-labelledby="d-activity">

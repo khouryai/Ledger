@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type TextareaHTMLAttributes } from 'react';
 import { parseDateInput } from '../../engine/dates';
 import { calendarOf } from '../../engine/ops';
 import type { Day, Person } from '../../engine/types';
@@ -96,8 +96,62 @@ export function PersonField({ value, onChange, label = 'Person', allowNone = tru
   );
 }
 
-/** A text box that saves when it loses focus, not on every keystroke. */
-export function CommitInput({ value, onCommit, className = 'input w-full', placeholder, multiline, testid, ariaLabel }: { value: string; onCommit: (v: string) => void; className?: string; placeholder?: string; multiline?: boolean; testid?: string; ariaLabel?: string }) {
+/** Set a textarea's height to its content, borders included, so nothing scrolls inside it. */
+function fit(el: HTMLTextAreaElement) {
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+}
+
+/**
+ * A textarea as tall as what is in it: every line of a long title or a note is on
+ * screen at once, and it grows as it is typed into. It is measured again when its
+ * width changes, because a narrower box wraps into more lines.
+ */
+export function AutoTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    if (ref.current) fit(ref.current);
+  }, [props.value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit(el);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return <textarea rows={1} {...props} ref={ref} className={`${props.className ?? ''} grow-ta`} />;
+}
+
+/**
+ * A text box that saves when it loses focus, not on every keystroke.
+ *
+ * `multiline` is a note: Enter is a new line. `grow` is a long single line, such as
+ * an item's title: it wraps onto as many lines as it needs, and Enter saves.
+ */
+export function CommitInput({
+  value,
+  onCommit,
+  className = 'input w-full',
+  placeholder,
+  multiline,
+  grow,
+  testid,
+  ariaLabel,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+  className?: string;
+  placeholder?: string;
+  multiline?: boolean;
+  grow?: boolean;
+  testid?: string;
+  ariaLabel?: string;
+}) {
   const [text, setText] = useState(value);
   const [focused, setFocused] = useState(false);
   useEffect(() => {
@@ -110,24 +164,23 @@ export function CommitInput({ value, onCommit, className = 'input w-full', place
     'data-testid': testid,
     'aria-label': ariaLabel,
     onFocus: () => setFocused(true),
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setText(e.target.value),
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setText(multiline ? e.target.value : e.target.value.replace(/[\r\n]+/g, ' ')),
     onBlur: () => {
       setFocused(false);
       if (text !== value) onCommit(text);
     },
   };
-  return multiline ? (
-    <textarea {...props} rows={3} />
-  ) : (
-    <input
-      {...props}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        if (e.key === 'Escape') {
-          setText(value);
-          setTimeout(() => (e.target as HTMLInputElement).blur());
-        }
-      }}
-    />
-  );
+  const keys = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !multiline) {
+      e.preventDefault();
+      (e.target as HTMLElement).blur();
+    }
+    if (e.key === 'Escape') {
+      setText(value);
+      setTimeout(() => (e.target as HTMLElement).blur());
+    }
+  };
+  if (multiline) return grow ? <AutoTextarea {...props} rows={3} onKeyDown={(e) => e.key === 'Escape' && keys(e)} /> : <textarea {...props} rows={3} />;
+  if (grow) return <AutoTextarea {...props} onKeyDown={keys} />;
+  return <input {...props} onKeyDown={keys} />;
 }

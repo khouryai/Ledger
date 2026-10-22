@@ -124,7 +124,35 @@ On each device: sign in, enter the code, enter the passphrase once (ticking *Rem
 on this device* on your own devices). After that it opens straight to Today, and opens
 with no signal from the copy it keeps, saving when the connection is back.
 
-## What does not move across
+## Someone else's ledger (a deputy, a colleague)
+
+Each account is a separate ledger: its own row, its own backups, its own vault,
+encrypted with its own passphrase. Nothing is shared and nothing can be. Row-level
+security shows each account only its own rows, and even read straight out of the
+database, one person's ledger is ciphertext the other's passphrase cannot open.
+
+To let someone have one, add their address to the members, in the SQL editor:
+
+```sql
+insert into public.ledger_members (email) values ('deputy@example.com');
+```
+
+They then open the same address, choose **First time: create the account**, and set
+up their own authenticator and passphrase. To take it away again:
+
+```sql
+delete from public.ledger_members where email = 'deputy@example.com';
+```
+
+Removing the address cuts the account off at once, even mid-session: every policy
+checks membership on every request. Their encrypted ledger stays in the database
+until the account is deleted in Authentication → Users.
+
+Two people should not share one browser profile: a browser holds one signed-in
+account at a time. Separate devices, or separate browser profiles, each keep their
+own.
+
+
 
 - **The on-device AI** needs a laptop's graphics chip. On a phone, the rules do every
   job without it.

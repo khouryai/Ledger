@@ -31,7 +31,8 @@ export function parseJsonAnswer<T>(text: string): T {
   }
 }
 
-export type ModelChoice = { id: string; label: string; maker: string; vramMB: number; note: string };
+/** `downloadMB` is roughly what is fetched and stored; `vramMB` is WebLLM's graphics-memory estimate. */
+export type ModelChoice = { id: string; label: string; maker: string; vramMB: number; downloadMB: number; note: string };
 
 /**
  * The models offered. Each is a prebuilt WebLLM model; the memory figure is WebLLM's
@@ -39,12 +40,12 @@ export type ModelChoice = { id: string; label: string; maker: string; vramMB: nu
  * companies have a policy on which ones may be used.
  */
 export const MODELS: ModelChoice[] = [
-  { id: 'Phi-4-mini-instruct-q4f16_1-MLC', label: 'Phi-4 mini', maker: 'Microsoft', vramMB: 3438, note: 'Best quality of the four. MIT licence.' },
-  { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', label: 'Llama 3.2 3B', maker: 'Meta', vramMB: 2264, note: 'Faster, slightly weaker.' },
-  { id: 'Qwen2.5-3B-Instruct-q4f16_1-MLC', label: 'Qwen 2.5 3B', maker: 'Alibaba', vramMB: 2505, note: 'Strong at structured answers. Check your company policy on Chinese-made models.' },
-  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', label: 'Llama 3.2 1B', maker: 'Meta', vramMB: 879, note: 'For laptops with little graphics memory. Noticeably weaker.' },
+  { id: 'Phi-4-mini-instruct-q4f16_1-MLC', label: 'Phi-4 mini', maker: 'Microsoft', vramMB: 3438, downloadMB: 2200, note: 'Best quality of the four. MIT licence.' },
+  { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', label: 'Llama 3.2 3B', maker: 'Meta', vramMB: 2264, downloadMB: 1800, note: 'Faster, slightly weaker.' },
+  { id: 'Qwen2.5-3B-Instruct-q4f16_1-MLC', label: 'Qwen 2.5 3B', maker: 'Alibaba', vramMB: 2505, downloadMB: 1750, note: 'Strong at structured answers. Check your company policy on Chinese-made models.' },
+  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', label: 'Llama 3.2 1B', maker: 'Meta', vramMB: 879, downloadMB: 750, note: 'For laptops with little graphics memory. Noticeably weaker.' },
 ];
 
 export function modelChoice(id: string): ModelChoice {
-  return MODELS.find((m) => m.id === id) ?? { id, label: id, maker: 'Unknown', vramMB: 0, note: '' };
+  return MODELS.find((m) => m.id === id) ?? { id, label: id, maker: 'Unknown', vramMB: 0, downloadMB: 2200, note: '' };
 }

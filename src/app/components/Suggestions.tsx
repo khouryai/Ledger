@@ -9,7 +9,7 @@ import { addItem, addPerson, calendarOf } from '../../engine/ops';
 import type { Day, Direction, LedgerDoc, Source } from '../../engine/types';
 import { makeFmt } from '../format';
 import { useApp } from '../state';
-import { DateField, PersonField } from './fields';
+import { AutoTextarea, DateField, PersonField } from './fields';
 import { Icon } from './icons';
 import { Badge } from './ui';
 
@@ -114,7 +114,7 @@ export function SuggestionList({ drafts, setDrafts, source, emptyText }: { draft
                     Waiting on
                   </button>
                 </div>
-                <input className="input min-w-0 flex-1" value={d.title} disabled={d.added} onChange={(e) => update(d.key, { title: e.target.value })} aria-label="Title" />
+                <AutoTextarea className="input sugg-title min-w-0 flex-1" value={d.title} disabled={d.added} onChange={(e) => update(d.key, { title: e.target.value.replace(/[\r\n]+/g, ' ') })} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()} aria-label="Title" />
                 {d.from === 'ai' && (
                   <span className="ai-mark">
                     <Icon name="sparkle" size={11} /> model

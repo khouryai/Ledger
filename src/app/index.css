@@ -1364,7 +1364,9 @@ section[id^='s-'] { scroll-margin-top: 16px; }
   /* An item fills the screen, its header and actions staying in reach. */
   .drawer { width: 100vw; border-left: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); animation: slide-up var(--dur) var(--easing); }
   .drawer-h { padding: 12px 14px 10px; }
-  .drawer-b { padding: 14px 14px 32px; }
+  .drawer-b { padding: 14px 14px 32px; flex: none; overflow: visible; }
+  /* One scroll for the whole item, so a long title never squeezes what is under it. */
+  .drawer { overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .drawer-h .btn { min-height: 40px; }
   .grid2 { grid-template-columns: 1fr; }
 
@@ -1381,3 +1383,10 @@ section[id^='s-'] { scroll-margin-top: 16px; }
   .skip-link { display: none; }
 }
 @keyframes slide-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Boxes as tall as their text: a long title or note is read and edited whole. */
+.grow-ta { resize: none; overflow: hidden; display: block; }
+.title-edit.grow-ta { line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 4px; padding-bottom: 4px; }
+.textarea.grow-ta { min-height: 88px; }
+.textarea.notes-ta { min-height: 88px; }
+.sugg-title.grow-ta { padding-top: 8px; padding-bottom: 8px; line-height: 1.35; min-height: 36px; }

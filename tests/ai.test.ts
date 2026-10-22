@@ -76,3 +76,36 @@ describe('reply rules', () => {
     expect(checkReplyRules('Noted.', TODAY, cal, 'MDY').verdict).toBe('unclear');
   });
 });
+
+describe('when the model will not download', () => {
+  it('tells a blocked network from a full disk from a refusing cache', async () => {
+    const { explainLoadError, shouldRetryOnIndexedDb } = await import('../src/ai/download');
+    const blocked = explainLoadError(new TypeError('Failed to fetch'), 2200);
+    expect(blocked.kind).toBe('blocked');
+    expect(blocked.message).toMatch(/another network/);
+    expect(shouldRetryOnIndexedDb(blocked, 'cache')).toBe(false);
+
+    const full = explainLoadError(Object.assign(new Error('The quota has been exceeded.'), { name: 'QuotaExceededError' }), 2200);
+    expect(full.kind).toBe('space');
+    expect(full.message).toMatch(/2\.1 GB/);
+    expect(shouldRetryOnIndexedDb(full, 'cache')).toBe(false);
+
+    // WebLLM's own error when Cache.add() fails: the network worked (it was checked
+    // first), so the other storage is tried, once.
+    const cache = explainLoadError(new TypeError("Failed to execute 'add' on 'Cache': Cache.add() encountered a network error"), 2200);
+    expect(cache.kind).toBe('storage');
+    expect(shouldRetryOnIndexedDb(cache, 'cache')).toBe(true);
+    expect(shouldRetryOnIndexedDb(cache, 'indexeddb')).toBe(false);
+    expect(cache.detail).toContain('Cache.add()');
+  });
+
+  it('refuses before downloading when the space is plainly not there', async () => {
+    const { freeMB, spaceProblem } = await import('../src/ai/download');
+    expect(freeMB(undefined)).toBeNull();
+    expect(spaceProblem(null, 2200)).toBeNull();
+    const free = freeMB({ quota: 1024 * 1048576, usage: 0 });
+    expect(free).toBe(1024);
+    expect(spaceProblem(free, 2200)).toMatch(/about 1\.0 GB free .* about 2\.1 GB/);
+    expect(spaceProblem(10_000, 2200)).toBeNull();
+  });
+});
