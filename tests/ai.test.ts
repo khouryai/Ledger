@@ -109,3 +109,46 @@ describe('when the model will not download', () => {
     expect(spaceProblem(10_000, 2200)).toBeNull();
   });
 });
+
+describe('a model saved to a folder', () => {
+  const u = {
+    id: 'Phi-4-mini-instruct-q4f16_1-MLC',
+    model: 'https://huggingface.co/mlc-ai/Phi-4-mini-instruct-q4f16_1-MLC',
+    base: 'https://huggingface.co/mlc-ai/Phi-4-mini-instruct-q4f16_1-MLC/resolve/main/',
+    lib: 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_86/base/Phi-4-mini-instruct-q4f16_1_cs1k-webgpu.wasm',
+  };
+  const ok = (extra: object[] = []) => ({
+    kind: 'ledger-model',
+    version: 1,
+    model: u.id,
+    savedAt: '2026-10-22T00:00:00Z',
+    files: [
+      { scope: 'webllm/model', url: `${u.base}tensor-cache.json`, path: 'model/tensor-cache.json', bytes: 10 },
+      { scope: 'webllm/model', url: `${u.base}params_shard_0.bin`, path: 'model/params_shard_0.bin', bytes: 10 },
+      { scope: 'webllm/wasm', url: u.lib, path: 'wasm/x.wasm', bytes: 10 },
+      ...extra,
+    ],
+  });
+
+  it('files each piece under the address WebLLM reads it from', async () => {
+    const { modelBase, pathFor, belongs } = await import('../src/ai/modelFolder');
+    expect(modelBase(u.model)).toBe(u.base);
+    expect(modelBase(`${u.model}/`)).toBe(u.base);
+    expect(pathFor('webllm/model', `${u.base}params_shard_3.bin`, u)).toBe('model/params_shard_3.bin');
+    expect(pathFor('webllm/wasm', u.lib, u)).toBe('wasm/Phi-4-mini-instruct-q4f16_1_cs1k-webgpu.wasm');
+    expect(belongs(`${u.base}tokenizer.json`, u)).toBe(true);
+    expect(belongs('https://huggingface.co/mlc-ai/Other-Model/resolve/main/tokenizer.json', u)).toBe(false);
+  });
+
+  it('loads only this model, and only at its own addresses', async () => {
+    const { checkManifest } = await import('../src/ai/modelFolder');
+    expect(checkManifest(ok(), u).files).toHaveLength(3);
+    expect(() => checkManifest({ ...ok(), model: 'Llama-3.2-1B-Instruct-q4f16_1-MLC' }, u)).toThrow(/holds Llama/);
+    // A folder cannot plant a file anywhere else: not another site, not another model.
+    expect(() => checkManifest(ok([{ scope: 'webllm/model', url: 'https://evil.example/x.js', path: 'model/x', bytes: 1 }]), u)).toThrow(/does not belong/);
+    expect(() => checkManifest(ok([{ scope: 'webllm/model', url: `${u.base}../../../Other/x`, path: 'model/x', bytes: 1 }]), u)).toThrow(/does not belong/);
+    expect(() => checkManifest(ok([{ scope: 'webllm/model', url: `${u.base}a.bin`, path: 'model/../../a.bin', bytes: 1 }]), u)).toThrow(/damaged/);
+    expect(() => checkManifest({ ...ok(), files: ok().files.slice(1) }, u)).toThrow(/tensor-cache/);
+    expect(() => checkManifest({ hello: 1 }, u)).toThrow(/no ledger-model\.json/);
+  });
+});

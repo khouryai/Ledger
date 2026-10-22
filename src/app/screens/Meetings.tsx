@@ -18,6 +18,7 @@ import { Icon } from '../components/icons';
 import { ItemRow } from '../components/ItemRow';
 import { QuickAdd } from '../components/QuickAdd';
 import { draftFromAsk, SuggestionList, type Draft } from '../components/Suggestions';
+import { useLearned, withLearning } from '../learning';
 import { copyRich, downloadFile, Empty, Hero, Section } from '../components/ui';
 import { makeFmt } from '../format';
 import { href, navigate, type Route } from '../router';
@@ -125,6 +126,7 @@ function MeetingPage({ meeting }: { meeting: Meeting }) {
   const added = session ? sessionItems(meeting, session.id, doc) : [];
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const learned = useLearned();
   const past = [...meeting.sessions].filter((x) => x.id !== sessionId).sort((a, b) => b.date.localeCompare(a.date));
 
   const start = () => {
@@ -146,11 +148,13 @@ function MeetingPage({ meeting }: { meeting: Meeting }) {
     const notes = session?.notes ?? '';
     if (!notes.trim()) return;
     const src = { kind: 'meeting' as const, ref: meeting.name, meetingId: meeting.id, sessionId: session?.id, date: session?.date };
+    // Notes are the user's own writing.
+    const here = { fromMe: true, people: doc.people, today: state.today, cal: ctx.cal, order: s.dateOrder };
     if (useAi) {
       setAiBusy(true);
       try {
         const asks = await ai.extract(notes, { fromMe: true });
-        setDrafts(asks.map((a, i) => ({ ...draftFromAsk(a, i, 'ai'), source: src })));
+        setDrafts(withLearning(asks.map((a, i) => ({ ...draftFromAsk(a, i, 'ai'), source: src })), learned.action, { text: notes, ...here }).map((d) => ({ ...d, source: src })));
       } catch (err) {
         actions.toast(`The model could not read the notes: ${(err as Error).message}`, 'error');
       } finally {
@@ -158,7 +162,7 @@ function MeetingPage({ meeting }: { meeting: Meeting }) {
       }
     } else {
       const asks = findAsks(notes, { today: state.today, cal: ctx.cal, order: s.dateOrder, people: doc.people, fromMe: true, myName: s.myName });
-      setDrafts(asks.map((a, i) => ({ ...draftFromAsk(a, i, 'rule'), source: src })));
+      setDrafts(withLearning(asks.map((a, i) => ({ ...draftFromAsk(a, i, 'rule'), source: src })), learned.action, { text: notes, ...here }).map((d) => ({ ...d, source: src })));
     }
   };
 

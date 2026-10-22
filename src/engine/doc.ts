@@ -2,6 +2,7 @@
  * The document as a whole: a fresh one, reading one off disk, and ids.
  */
 import { isDay } from './dates';
+import type { Example } from './learn';
 import { defaultSettings, DEFAULT_TEMPLATES, SCHEMA_VERSION, type Item, type LedgerDoc, type Meeting, type Person, type Settings } from './types';
 
 let counter = 0;
@@ -20,6 +21,7 @@ export function emptyDoc(now = new Date()): LedgerDoc {
     items: [],
     meetings: [],
     dismissed: [],
+    examples: [],
     nextNum: 1,
     createdAt: now.toISOString(),
   };
@@ -99,6 +101,19 @@ function readItem(raw: unknown, problems: string[]): Item | null {
   };
 }
 
+function isExample(v: unknown): v is Example {
+  return (
+    isObj(v) &&
+    typeof v.id === 'string' &&
+    typeof v.at === 'string' &&
+    (v.task === 'action' || v.task === 'reply') &&
+    typeof v.text === 'string' &&
+    typeof v.label === 'string' &&
+    (v.fromMe === undefined || typeof v.fromMe === 'boolean') &&
+    (v.proposed === undefined || typeof v.proposed === 'string')
+  );
+}
+
 /**
  * Read a document off disk. Unknown fields are dropped, missing ones filled, and
  * anything unreadable reported rather than silently lost.
@@ -126,6 +141,7 @@ export function readDoc(raw: unknown): { doc: LedgerDoc; problems: string[] } {
       items,
       meetings,
       dismissed: Array.isArray(raw.dismissed) ? raw.dismissed.filter((d): d is string => typeof d === 'string') : [],
+      examples: Array.isArray(raw.examples) ? raw.examples.filter(isExample) : [],
       nextNum: next,
       createdAt: str(raw.createdAt) ?? base.createdAt,
     },

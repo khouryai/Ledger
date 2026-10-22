@@ -19,9 +19,16 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// Only this app's own earlier caches are cleared. Everything else in the site's cache
+// storage belongs to somebody else: WebLLM keeps the downloaded model in caches named
+// webllm/*, and clearing those on every update deleted the model, and broke a download
+// that was in progress when an update took over.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ledger-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 

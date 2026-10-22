@@ -206,6 +206,8 @@ export function mergeDocs(base: LedgerDoc, mine: LedgerDoc, theirs: LedgerDoc, n
       items,
       meetings,
       dismissed: mergeSet(base.dismissed, mine.dismissed, theirs.dismissed),
+      // Examples are never edited: both devices' are kept, and one forgotten on either is gone.
+      examples: byId(base.examples, mine.examples, theirs.examples, (_b, m) => m).sort((a, b) => a.at.localeCompare(b.at)),
       nextNum,
       createdAt: base.createdAt || mine.createdAt,
     },

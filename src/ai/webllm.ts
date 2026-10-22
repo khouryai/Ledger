@@ -7,6 +7,7 @@
  */
 import { explainLoadError, freeMB, shouldRetryOnIndexedDb, spaceProblem, type CacheBackend, type LoadProblem } from './download';
 import { modelChoice, type AiEngine, type AiRequest } from './engine';
+import { clearModel, loadModel, modelBase, saveModel, type ModelUrls, type Progress } from './modelFolder';
 
 type WebLlm = typeof import('@mlc-ai/web-llm');
 type Engine = Awaited<ReturnType<WebLlm['CreateMLCEngine']>>;
@@ -123,8 +124,27 @@ export async function isDownloaded(model: string): Promise<boolean> {
 
 /** Delete the model's files from both kinds of storage, including a half-finished download. */
 export async function removeDownload(model: string): Promise<void> {
+  const u = await urlsOf(model);
+  for (const b of ['cache', 'indexeddb'] as const) await clearModel(u, b).catch(() => 0);
+}
+
+async function urlsOf(model: string): Promise<ModelUrls & { id: string }> {
   const w = await load();
-  for (const b of ['cache', 'indexeddb'] as const) await w.deleteModelAllInfoInCache(model, await appConfig(b)).catch(() => undefined);
+  const rec = w.prebuiltAppConfig.model_list.find((m) => m.model_id === model);
+  if (!rec) throw new Error(`${model} is not one of the models WebLLM knows.`);
+  return { id: model, model: rec.model, base: modelBase(rec.model), lib: rec.model_lib };
+}
+
+/** Copy the downloaded model into a folder, to carry to another browser or computer. */
+export async function saveModelToFolder(model: string, dir: FileSystemDirectoryHandle, onProgress: Progress) {
+  return saveModel(dir, model, await urlsOf(model), preferredBackend(), onProgress);
+}
+
+/** Put a model saved to a folder into this browser, so nothing needs downloading. */
+export async function loadModelFromFolder(model: string, dir: FileSystemDirectoryHandle, onProgress: Progress) {
+  const r = await loadModel(dir, await urlsOf(model), preferredBackend(), onProgress);
+  if (!(await isDownloaded(model))) throw new Error('The files were copied in, but the model still does not read as complete. Save it again from the other browser.');
+  return r;
 }
 
 export class WebLlmEngine implements AiEngine {
@@ -151,7 +171,7 @@ export class WebLlmEngine implements AiEngine {
       // The Cache API refused though the network worked: start again in IndexedDB,
       // clearing what the failed attempt left behind.
       onProgress(0, "The browser's cache refused the files; trying its other storage");
-      await w.deleteModelAllInfoInCache(model, { ...w.prebuiltAppConfig, cacheBackend: 'cache' }).catch(() => undefined);
+      await clearModel(await urlsOf(model), 'cache').catch(() => 0);
       try {
         const engine = await attempt('indexeddb');
         rememberBackend('indexeddb');

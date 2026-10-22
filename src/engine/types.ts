@@ -7,6 +7,7 @@
  * never stored. A stored derived value goes stale the moment the calendar turns over,
  * and nobody notices until it is wrong in front of them.
  */
+import type { Example } from './learn';
 
 /** A calendar day, `YYYY-MM-DD`, in the user's local time. */
 export type Day = string;
@@ -54,7 +55,7 @@ export type HistoryKind =
   | 'unlinked';
 
 /** Who made a change: you, or a rule or the model you accepted a suggestion from. */
-export type Actor = 'you' | 'rule' | 'ai' | 'outlook';
+export type Actor = 'you' | 'rule' | 'ai' | 'outlook' | 'learned';
 
 /**
  * One line in an item's history. Appended, never edited or removed: the history is
@@ -193,6 +194,8 @@ export type LedgerDoc = {
   meetings: Meeting[];
   /** Outlook messages the user said were not worth tracking. */
   dismissed: string[];
+  /** What the user decided about suggestions and replies: what engine/learn.ts learns from. */
+  examples: Example[];
   nextNum: number;
   createdAt: string;
 };

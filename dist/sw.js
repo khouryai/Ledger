@@ -1,7 +1,7 @@
 /* Generated at build time. Precache the app shell so the window opens instantly with no network. */
-const VERSION = 'mvis1ju4';
+const VERSION = 'mvitqfwp';
 const CACHE = `ledger-${VERSION}`;
-const PRECACHE = ["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","assets/archivo-latin-wght-normal-E0tuGl4L.woff2","assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2","assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2","assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2","assets/index-DcYzajQC.css","assets/People-CRhhoeLV.js","assets/Meetings-BZPiSxNU.js","assets/Capture-CpBV3vnP.js","assets/Review-WUlwM9_d.js","assets/Outlook-B23ffbR3.js","assets/email-B1kOUbPz.js","assets/Settings-B0OuDqbd.js","assets/xlsx-BTwSjrg6.js","assets/fakeApi-BMFtMTEu.js","assets/fake-_0Nd_vOp.js","assets/webllm-L-8wf1r8.js","assets/index-BI-C95S3.js","assets/msg-BaPSehTl.js"];
+const PRECACHE = ["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","assets/archivo-latin-wght-normal-E0tuGl4L.woff2","assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2","assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2","assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2","assets/index-CV3aKRqu.css","assets/People-Bzg5fcMO.js","assets/Meetings-CuqpaxVI.js","assets/Capture-CDYggCls.js","assets/Review-Dhl_P8Jp.js","assets/Outlook-WjqxuXwN.js","assets/email-C22mIrw-.js","assets/Settings-DjVmINdF.js","assets/xlsx-DArbZi3W.js","assets/fakeApi-c87G1C5n.js","assets/fake-YOAUGxae.js","assets/webllm-DnEHPmq5.js","assets/index-BI-C95S3.js","assets/msg-7rXHQLH1.js"];
 // Where the app lives: the root on the laptop, /Ledger/ on GitHub Pages.
 const SCOPE = new URL(self.registration.scope).pathname;
 const SHELL = new URL('index.html', self.registration.scope).href;
@@ -19,9 +19,16 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// Only this app's own earlier caches are cleared. Everything else in the site's cache
+// storage belongs to somebody else: WebLLM keeps the downloaded model in caches named
+// webllm/*, and clearing those on every update deleted the model, and broke a download
+// that was in progress when an update took over.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ledger-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 

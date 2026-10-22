@@ -10,6 +10,7 @@ import { canUseOutlook, graphClient } from '../../graph/client';
 import { flaggedToDo, meetingsToday, unansweredAsks, type GraphMessage, type OutlookSuggestion, type TodayMeeting } from '../../graph/suggest';
 import { Icon } from '../components/icons';
 import { SuggestionList, type Draft } from '../components/Suggestions';
+import { useLearned, withLearning } from '../learning';
 import { Empty, Hero, Section } from '../components/ui';
 import { href, navigate } from '../router';
 import { useApp } from '../state';
@@ -42,6 +43,7 @@ export function Outlook() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<Draft[] | null>(null);
   const [flagged, setFlagged] = useState<Draft[] | null>(null);
+  const learned = useLearned();
   const can = canUseOutlook();
 
   const tracked = new Set([...doc.dismissed, ...doc.items.map((i) => i.source?.messageId).filter((x): x is string => !!x)]);
@@ -58,8 +60,10 @@ export function Outlook() {
       const thread = new Map<string, GraphMessage[]>();
       for (const m of mail.slice(0, 60)) if (m.conversationId && !thread.has(m.conversationId)) thread.set(m.conversationId, await g.conversation(m.conversationId));
       const ctx = { me: { name: doc.settings.myName || me.displayName || '', email: myEmail }, today: state.today, cal: calendarOf(doc.settings), order: doc.settings.dateOrder, people: doc.people, noReplyAfter: o.noReplyAfter, skip: tracked };
-      setSent(unansweredAsks(mail, thread, ctx).map((x) => toDraft(x, doc.people)));
-      setFlagged(flaggedToDo(await g.flagged(), ctx).map((x) => toDraft(x, doc.people)));
+      // Sent mail is the user's own writing; a flagged email is somebody else's.
+      const here = { people: doc.people, today: state.today, cal: ctx.cal, order: doc.settings.dateOrder };
+      setSent(withLearning(unansweredAsks(mail, thread, ctx).map((x) => toDraft(x, doc.people)), learned.action, { ...here, fromMe: true }));
+      setFlagged(withLearning(flaggedToDo(await g.flagged(), ctx).map((x) => toDraft(x, doc.people)), learned.action, { ...here, fromMe: false }));
     } catch (err) {
       setError((err as Error).message);
     } finally {

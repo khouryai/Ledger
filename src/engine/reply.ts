@@ -13,7 +13,8 @@ export type ReplyCheck = {
   promise?: Day;
   promisePhrase?: string;
   summary: string;
-  by: 'rule' | 'ai';
+  /** Who read it: the rules, the on-device model, what was learned from the user, or the user. */
+  by: 'rule' | 'ai' | 'learned' | 'you';
 };
 
 const DELIVERED = /\b(attached|please find|here (is|are)|enclosed|i('ve| have) (sent|uploaded|shared|attached|completed|done|issued|submitted)|(has|have) been (sent|uploaded|shared|completed|done|issued|submitted|approved)|done\b|completed\b|now (closed|resolved|fixed|available)|see (the )?(link|attached))/i;

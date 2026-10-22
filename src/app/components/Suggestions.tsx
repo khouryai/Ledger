@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { Ask } from '../../engine/asks';
+import { learn, relative, type ActionLabel, type ExampleDraft } from '../../engine/learn';
 import { addItem, addPerson, calendarOf } from '../../engine/ops';
 import type { Day, Direction, LedgerDoc, Source } from '../../engine/types';
 import { makeFmt } from '../format';
@@ -24,8 +25,16 @@ export type Draft = {
   due?: Day;
   askedOn?: Day;
   quote: string;
-  from: 'rule' | 'ai' | 'outlook';
+  from: 'rule' | 'ai' | 'outlook' | 'learned';
   note?: string;
+  /** Whether the text it came from was written by the user: what the learning is relative to. */
+  fromMe?: boolean;
+  /** Who the app proposed does it, before the user said: kept to measure the rules against the learning. */
+  proposed?: ActionLabel;
+  /** Why the learning changed or added this suggestion. */
+  learnedNote?: string;
+  /** Already learned from: a second press of Add does not teach the same thing twice. */
+  taught?: boolean;
   quoteFound?: boolean;
   messageId?: string;
   source?: Source;
@@ -74,7 +83,7 @@ export function SuggestionList({ drafts, setDrafts, source, emptyText }: { draft
             personId = r.person.id;
           }
         }
-        const by = d.from === 'ai' ? 'ai' : d.from === 'outlook' ? 'outlook' : 'rule';
+        const by = d.from === 'ai' ? 'ai' : d.from === 'outlook' ? 'outlook' : d.from === 'learned' ? 'learned' : 'rule';
         const r = addItem(
           out,
           {
@@ -92,9 +101,19 @@ export function SuggestionList({ drafts, setDrafts, source, emptyText }: { draft
         out = r.doc;
         count++;
       }
-      return out;
+      // What the user decided about each suggestion, kept or unticked, is learned from.
+      const examples: ExampleDraft[] = drafts
+        .filter((d) => !d.added && !d.taught && d.quote && d.fromMe !== undefined)
+        .map((d) => ({
+          task: 'action' as const,
+          text: d.quote,
+          fromMe: d.fromMe,
+          label: d.on ? relative(d.direction, d.fromMe!) : 'none',
+          proposed: d.proposed,
+        }));
+      return learn(out, examples, new Date());
     }, () => `Added ${count} item${count === 1 ? '' : 's'}.`);
-    setDrafts(drafts.map((d) => (d.on && !d.added ? { ...d, added: true } : d)));
+    setDrafts(drafts.map((d) => ({ ...d, added: d.added || d.on, taught: true })));
   };
 
   if (!drafts.length) return <div className="empty">{emptyText ?? 'No actions found.'}</div>;
@@ -118,6 +137,11 @@ export function SuggestionList({ drafts, setDrafts, source, emptyText }: { draft
                 {d.from === 'ai' && (
                   <span className="ai-mark">
                     <Icon name="sparkle" size={11} /> model
+                  </span>
+                )}
+                {(d.from === 'learned' || d.learnedNote) && (
+                  <span className="learned-mark" title="Changed or found by what Ledger learned from your earlier decisions">
+                    <Icon name="user" size={11} /> learned
                   </span>
                 )}
                 {d.added && <Badge tone="good">Added</Badge>}
@@ -153,6 +177,7 @@ export function SuggestionList({ drafts, setDrafts, source, emptyText }: { draft
                   </div>
                 )}
               </div>
+              {d.learnedNote && <div className="learned-note">{d.learnedNote}</div>}
               {d.note && <div className="hint">{d.note}</div>}
             </div>
           </div>

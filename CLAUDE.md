@@ -27,7 +27,11 @@ npm run test:ui     # both builds in Chromium; any console error fails a test
   through `actions.apply(op)` with an `Op` from `engine/ops.ts`, which keeps undo and
   autosave working. Nothing mutates the document in place.
 - `src/ai/` is the on-device model. `tasks.ts` builds every prompt and checks every
-  answer; nothing in `src/app/` talks to the engine directly.
+  answer; nothing in `src/app/` talks to the engine directly. `download.ts` explains a
+  failed download; `modelFolder.ts` copies a downloaded model to a folder and back.
+- `src/engine/learn.ts` is the model that learns from the user's decisions (docs/AI.md).
+  Examples are stored in the ledger (`doc.examples`); the model is rebuilt from them,
+  never stored. `src/app/learning.ts` applies it to suggestions.
 - `src/graph/` is Outlook. `suggest.ts` is pure and tested; `client.ts` is the only
   file that knows MSAL or Graph URLs.
 - `src/storage/` is copied from P6-KPI (folder, IndexedDB, memory; atomic writes and
@@ -78,6 +82,12 @@ npm run test:ui     # both builds in Chromium; any console error fails a test
 - **The hosted page's CSP is the boundary for injected script**: no inline script, no
   `eval`, connections only to listed hosts. A new outside host is added to `csp()` in
   `vite.config.ts` deliberately, as narrowly as the host allows.
+- **The learning changes nothing silently.** It unticks, turns round or adds a
+  suggestion only with the reason in words, and only once it has seen enough; a
+  decision is learned from once. Its accuracy is reported against what was proposed.
+- **The service worker clears only its own caches** (`ledger-*`). The site's cache
+  storage also holds the downloaded model (`webllm/*`); clearing it on each update
+  deleted the model and broke downloads in progress.
 - Colours go through the tokens in `src/app/index.css` (shared with cx-portal and
   P6-KPI). No emoji as icons: `src/app/components/icons.tsx`.
 

@@ -5,11 +5,13 @@
 import { useEffect, useState } from 'react';
 import { useAiStatus } from '../../ai/manager';
 import { age, chasePlan, expectedArrival, isSnoozed, risk } from '../../engine/decide';
-import { addNote, addPerson, calendarOf, drop, link, recordPromise, reopen, unlink, updateItem, levelWord, wouldCycle, type ItemPatch } from '../../engine/ops';
+import { learn, judgeReply, type ReplyLabel } from '../../engine/learn';
+import { addNote, addPerson, calendarOf, complete, drop, link, recordPromise, reopen, unlink, updateItem, levelWord, wouldCycle, type ItemPatch } from '../../engine/ops';
 import { checkReplyRules, type ReplyCheck } from '../../engine/reply';
 import { personStats } from '../../engine/stats';
-import type { Item, Recurrence } from '../../engine/types';
+import type { Item, LedgerDoc, Recurrence } from '../../engine/types';
 import { useAi } from '../ai';
+import { useLearned } from '../learning';
 import { fmtWhen, makeFmt } from '../format';
 import { href } from '../router';
 import { useApp } from '../state';
@@ -63,6 +65,8 @@ function Body({ item }: { item: Item }) {
   const [reply, setReply] = useState('');
   const [check, setCheck] = useState<ReplyCheck | null>(null);
   const [checking, setChecking] = useState(false);
+  const [taught, setTaught] = useState(false);
+  const learned = useLearned();
   const [editChase, setEditChase] = useState(!!item.nextChase);
   const [showReply, setShowReply] = useState(false);
   const [dropping, setDropping] = useState(false);
@@ -82,14 +86,24 @@ function Body({ item }: { item: Item }) {
       msg,
     );
 
+  // Where the learning is sure and disagrees, its reading is shown instead, with why.
+  const withLearned = (c: ReplyCheck): ReplyCheck => {
+    setTaught(false);
+    const j = judgeReply(learned.reply, reply, c.verdict);
+    return j ? { ...c, verdict: j.verdict, summary: j.reason, by: 'learned' } : c;
+  };
+  // What the user did with a verdict is what it is learned from, once per check.
+  const teach = (d: LedgerDoc, label: ReplyLabel): LedgerDoc => (taught || !check ? d : learn(d, [{ task: 'reply', text: reply, label, proposed: check.verdict }], new Date()));
+  const VERDICT: Record<ReplyLabel, string> = { delivered: 'Delivered', partial: 'Part delivered', stall: 'Not delivered', unclear: 'Unclear' };
+
   const runCheck = async () => {
     if (!reply.trim()) return;
     setChecking(true);
     try {
-      setCheck(ai.on ? await ai.reply(item, reply) : checkReplyRules(reply, state.today, cal, s.dateOrder));
+      setCheck(withLearned(ai.on ? await ai.reply(item, reply) : checkReplyRules(reply, state.today, cal, s.dateOrder)));
     } catch (err) {
       actions.toast(`The model could not check it (${(err as Error).message}). Checked by rules instead.`, 'error');
-      setCheck(checkReplyRules(reply, state.today, cal, s.dateOrder));
+      setCheck(withLearned(checkReplyRules(reply, state.today, cal, s.dateOrder)));
     } finally {
       setChecking(false);
     }
@@ -430,14 +444,39 @@ function Body({ item }: { item: Item }) {
                     <Badge tone={check.verdict === 'delivered' ? 'good' : check.verdict === 'partial' ? 'info' : check.verdict === 'stall' ? 'warn' : 'muted'}>
                       {check.verdict === 'delivered' ? 'Delivered' : check.verdict === 'partial' ? 'Part delivered' : check.verdict === 'stall' ? 'Not delivered' : 'Unclear'}
                     </Badge>{' '}
-                    {check.summary} <span className="hint">({check.by === 'ai' ? 'model' : 'rules'})</span>
+                    {check.summary} <span className="hint">({check.by === 'ai' ? 'model' : check.by === 'learned' ? 'learned from you' : check.by === 'you' ? 'yours' : 'rules'})</span>
                   </span>
                 )}
               </div>
+              {check && check.by !== 'you' && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]" data-testid="reply-correct">
+                  <span className="hint">Not right? It was:</span>
+                  {(['delivered', 'partial', 'stall', 'unclear'] as const)
+                    .filter((v) => v !== check.verdict)
+                    .map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className="chip"
+                        onClick={() => {
+                          actions.apply((d) => teach(d, v));
+                          setTaught(true);
+                          setCheck({ ...check, verdict: v, summary: 'As you said. Ledger learns from it.', by: 'you' });
+                        }}
+                      >
+                        {VERDICT[v]}
+                      </button>
+                    ))}
+                </div>
+              )}
               {check && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {check.verdict === 'delivered' && (
-                    <button type="button" className="btn btn-primary btn-mini" onClick={() => a.close(item, 'Delivered (from their reply)')}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-mini"
+                      onClick={() => actions.apply((d) => teach(complete(d, item.id, 'Delivered (from their reply)', new Date()).doc, 'delivered'), `Received: #${item.num}`)}
+                    >
                       Mark received
                     </button>
                   )}
@@ -446,7 +485,10 @@ function Body({ item }: { item: Item }) {
                       type="button"
                       className="btn btn-mini"
                       onClick={() => {
-                        actions.apply((d) => recordPromise(d, item.id, check.promise, `"${check.promisePhrase}" in their reply`, new Date(), check.by), `New promise: ${fmt.day(check.promise)}`);
+                        actions.apply(
+                          (d) => teach(recordPromise(d, item.id, check.promise, `"${check.promisePhrase}" in their reply`, new Date(), check.by), check.verdict === 'partial' ? 'partial' : 'stall'),
+                          `New promise: ${fmt.day(check.promise)}`,
+                        );
                         setReply('');
                         setCheck(null);
                         setShowReply(false);

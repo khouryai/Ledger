@@ -60,6 +60,47 @@ own storage (the Cache API for the served version, IndexedDB for the single file
 opened from disk) and loaded from there afterwards with no network. **Settings → Remove
 the download** deletes them.
 
+## Learning from you (no download)
+
+Separate from the downloaded model, Ledger learns from what you decide, in
+`src/engine/learn.ts`. Every suggestion you keep, untick or turn round in Capture,
+meeting notes or Outlook, and every reply verdict you act on or correct, is stored in
+your ledger as an example: the sentence, and what you said it was. Encrypted with
+the rest of it in your account, and on every device you sign in on.
+
+The model is built from those examples each time the ledger opens (milliseconds; it
+is never stored). It is a small statistical model over words, word pairs and a few
+cues, so it runs on a phone, needs no graphics chip and no network, and can say why
+it decided anything. Once it has seen enough (30 suggestions with some of each kind,
+20 replies), it:
+
+- **unticks** a suggestion like the ones you always untick,
+- **turns round** I owe / Waiting on where you always do,
+- **finds** sentences the rules passed over that read like your actions,
+- **reads a reply** your way when it disagrees with the rules and is sure.
+
+Each change is marked *learned* with its reason in words, for example: *Unticked:
+sentences like this were not actions for you ("fyi please" was unticked 8 times and
+kept 0).* Settings → Learning from you shows what it learned, the phrases that decide,
+and how often it is right, tested on decisions it had not seen, beside how often the
+suggestions were right before it learned. **Forget what it learned** clears it.
+
+It writes nothing: chasers and summaries stay with the templates, or the downloaded
+model.
+
+## A model from a folder (when Hugging Face is blocked)
+
+The downloaded model can be carried to another computer or browser:
+**Settings → On-device AI → Save it to a folder** copies its files (about 2 GB, with a
+small `ledger-model.json` list) into a folder; **Load it from a folder instead** puts
+them back where the model would have downloaded them, so it opens with nothing
+downloaded. Download it once where Hugging Face is reachable (home Wi-Fi, a hotspot),
+save it to OneDrive or a USB stick, and load it on the work laptop. The folder holds
+only the public model files, nothing of yours. A folder can only fill in that model's
+own files at its own addresses; anything else in its list is refused.
+
+Edge or Chrome on a computer (folders cannot be opened on a phone).
+
 ## Testing
 
 The browser tests run the whole path (prompt, answer, checking, accepting) with a

@@ -14,6 +14,7 @@ import type { Source } from '../../engine/types';
 import { useAi } from '../ai';
 import { Icon } from '../components/icons';
 import { draftFromAsk, SuggestionList, type Draft } from '../components/Suggestions';
+import { useLearned, withLearning } from '../learning';
 import { Hero } from '../components/ui';
 import { makeFmt } from '../format';
 import { useApp } from '../state';
@@ -32,6 +33,7 @@ export function Capture() {
   const [fromMeOverride, setFromMeOverride] = useState<boolean | null>(null);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const learned = useLearned();
 
   const messages: Message[] = useMemo(() => files ?? (text.trim() ? parsePasted(text) : []), [files, text]);
   const msg = messages[Math.min(pick, messages.length - 1)];
@@ -47,7 +49,8 @@ export function Capture() {
   const runRules = () => {
     if (!msg) return;
     const asks = findAsks(msg.body, { today: state.today, cal, order: s.dateOrder, people: doc.people, fromMe, sender, recipient, myName: s.myName });
-    setDrafts(asks.map((a, i) => ({ ...draftFromAsk(a, i, 'rule'), askedOn: msg.date && msg.date < state.today ? msg.date : undefined })));
+    const drafts = asks.map((a, i) => ({ ...draftFromAsk(a, i, 'rule'), askedOn: msg.date && msg.date < state.today ? msg.date : undefined }));
+    setDrafts(withLearning(drafts, learned.action, { text: msg.body, fromMe, sender, people: doc.people, today: state.today, cal, order: s.dateOrder }));
   };
 
   const runAi = async () => {
@@ -55,7 +58,8 @@ export function Capture() {
     setAiBusy('Starting');
     try {
       const asks = await ai.extract(msg.body, { fromMe, sender: sender?.name, recipient: recipient?.name }, (d, t) => setAiBusy(t > 1 ? `Reading part ${Math.min(d + 1, t)} of ${t}` : 'Reading'));
-      setDrafts(asks.map((a, i) => ({ ...draftFromAsk(a, i, 'ai'), askedOn: msg.date && msg.date < state.today ? msg.date : undefined })));
+      const drafts = asks.map((a, i) => ({ ...draftFromAsk(a, i, 'ai'), askedOn: msg.date && msg.date < state.today ? msg.date : undefined }));
+      setDrafts(withLearning(drafts, learned.action, { text: msg.body, fromMe, sender, people: doc.people, today: state.today, cal, order: s.dateOrder }));
     } catch (err) {
       actions.toast(`The model could not read it: ${(err as Error).message}. The rules still work.`, 'error');
     } finally {

@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { accuracy, forget, needs, ready, signature } from '../../engine/learn';
+import { useLearned } from '../learning';
+import { fsaSupported } from '../folder';
 import { MODELS, modelChoice } from '../../ai/engine';
 import { aiIsFake, getEngine, unloadEngine, useAiStatus } from '../../ai/manager';
 import { isDay } from '../../engine/dates';
@@ -43,6 +46,7 @@ export function Settings() {
           <WorkingWeek />
           <Chasing />
           <Templates />
+          <Learning />
           <AiSettings />
           <OutlookSettings />
           <About />
@@ -58,6 +62,7 @@ const TOC: [string, string][] = [
   ['s-week', 'Working week'],
   ['s-chasing', 'Chasing'],
   ['s-wording', 'Chaser wording'],
+  ['s-learn', 'Learning from you'],
   ['s-ai', 'On-device AI'],
   ['s-outlook', 'Outlook'],
   ['s-about', 'About'],
@@ -357,6 +362,88 @@ function Templates() {
   );
 }
 
+/** What Ledger has learned from the user's own decisions, how well, and a way to forget it. */
+function Learning() {
+  const { state, actions } = useApp();
+  const learned = useLearned();
+  const examples = state.doc.examples;
+  const acc = useMemo(() => ({ action: accuracy(examples, 'action'), reply: accuracy(examples, 'reply') }), [examples]);
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const rows = [
+    {
+      task: 'action' as const,
+      title: 'Finding actions',
+      what: 'From every suggestion you keep, untick or turn round in Capture, meetings and Outlook.',
+      m: learned.action,
+      a: acc.action,
+      yes: signature(learned.action, 'other', ['none']).concat(signature(learned.action, 'writer', ['none'])).slice(0, 6),
+      no: signature(learned.action, 'none', ['writer', 'other']),
+    },
+    {
+      task: 'reply' as const,
+      title: 'Reading replies',
+      what: 'From every reply you mark received, give a new date for, or correct.',
+      m: learned.reply,
+      a: acc.reply,
+      yes: signature(learned.reply, 'delivered', ['partial', 'stall', 'unclear']),
+      no: signature(learned.reply, 'stall', ['delivered', 'partial', 'unclear']),
+    },
+  ];
+  return (
+    <Section id="s-learn" title="Learning from you">
+      <div className="card">
+        <p className="text-[13px]">
+          Ledger learns from what you decide, on this device, in a fraction of a second, with nothing to download. It works on your phone too. What it learns from is kept in your ledger,
+          encrypted with it in your account; every change it makes says why, and you can always overrule it.
+        </p>
+        <div className="learn-grid mt-3">
+          {rows.map((r) => (
+            <div key={r.task} className="learn-card" data-testid={`learn-${r.task}`}>
+              <div className="flex items-baseline justify-between gap-2">
+                <b className="text-[13px]">{r.title}</b>
+                {ready(r.m) ? <span className="badge badge-good">In use</span> : <span className="badge">Learning</span>}
+              </div>
+              <div className="hint mt-1">{r.what}</div>
+              <div className="mt-2 text-[12.5px]">
+                {r.m.n === 0
+                  ? 'Nothing yet.'
+                  : ready(r.m)
+                    ? `${r.m.n} decisions learned from.`
+                    : `${r.m.n} decisions so far; it starts helping after ${r.m.n + Math.max(needs(r.m), 1)}${r.task === 'action' ? ', with some of each kind' : ''}.`}
+              </div>
+              {r.a && (
+                <div className="mt-1 text-[12.5px]">
+                  Right <b>{pct(r.a.learned)}</b> of the time on your last {r.a.n}, tested on decisions it had not seen
+                  {r.a.proposed !== null ? `; what was suggested before it learned was right ${pct(r.a.proposed)}.` : '.'}
+                </div>
+              )}
+              {r.yes.length > 0 && (
+                <div className="hint mt-2">
+                  {r.task === 'action' ? 'Means an action to you' : 'Means delivered'}: {r.yes.join(', ')}
+                </div>
+              )}
+              {r.no.length > 0 && (
+                <div className="hint mt-1">
+                  {r.task === 'action' ? 'Not an action to you' : 'Means not yet'}: {r.no.join(', ')}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        {examples.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-mini mt-3"
+            onClick={() => window.confirm('Forget everything Ledger has learned from your decisions? Suggestions go back to the rules alone. You can undo it.') && actions.apply((d) => forget(d), 'Forgot what it learned.')}
+          >
+            Forget what it learned
+          </button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function AiSettings() {
   const { state, actions } = useApp();
   const s = state.doc.settings;
@@ -365,6 +452,36 @@ function AiSettings() {
   const [gpu, setGpu] = useState<string | null>(null);
   const [downloaded, setDownloaded] = useState<boolean | null>(null);
   const [test, setTest] = useState<string | null>(null);
+  const [copying, setCopying] = useState<string | null>(null);
+  const copy = async (dir: 'save' | 'load') => {
+    if (!fsaSupported()) {
+      actions.toast('This browser cannot open folders. Use Edge or Chrome on a computer.', 'error');
+      return;
+    }
+    let root: FileSystemDirectoryHandle;
+    try {
+      root = await window.showDirectoryPicker!({ id: 'ledger-model', mode: dir === 'save' ? 'readwrite' : 'read' });
+    } catch {
+      return;
+    }
+    const w = await import('../../ai/webllm');
+    const progress = (done: number, total: number, text: string) => setCopying(`${text} (${done} of ${total})`);
+    try {
+      if (dir === 'save') {
+        const r = await w.saveModelToFolder(s.ai.model, root, progress);
+        actions.toast(`Saved ${m.label} to ${r.folder} (${(r.bytes / 1073741824).toFixed(1)} GB). Copy that folder to the other computer, then load it there.`, 'info');
+      } else {
+        await unloadEngine();
+        const r = await w.loadModelFromFolder(s.ai.model, root, progress);
+        setDownloaded(true);
+        actions.toast(`Loaded ${m.label} from the folder: ${r.files} files, nothing downloaded.`, 'info');
+      }
+    } catch (e) {
+      actions.toast((e as Error).message, 'error');
+    } finally {
+      setCopying(null);
+    }
+  };
   const set = (patch: Partial<S['ai']>) => actions.apply((d) => updateSettings(d, { ai: { ...d.settings.ai, ...patch } }));
   const m = modelChoice(s.ai.model);
 
@@ -441,6 +558,15 @@ function AiSettings() {
               >
                 Try it on a sample
               </button>
+              {downloaded ? (
+                <button type="button" className="btn btn-mini" disabled={!!copying} onClick={() => void copy('save')} data-testid="ai-save-folder">
+                  <Icon name="download" size={12} /> Save it to a folder
+                </button>
+              ) : (
+                <button type="button" className="btn btn-mini" disabled={!!copying || status.state === 'loading'} onClick={() => void copy('load')} data-testid="ai-load-folder">
+                  Load it from a folder instead
+                </button>
+              )}
               {downloaded && (
                 <button
                   type="button"
@@ -496,6 +622,13 @@ function AiSettings() {
                 </div>
               )}
             </div>
+            {copying && <div className="hint mt-2" data-testid="ai-copying">{copying}</div>}
+            {!downloaded && (
+              <p className="hint mt-2">
+                Network blocks Hugging Face? Download the model once somewhere it is not blocked (home Wi-Fi, a phone hotspot, or another browser), choose <b>Save it to a folder</b> there,
+                copy that folder over (OneDrive or a USB stick), then <b>Load it from a folder instead</b> here. Nothing is downloaded, and nothing of yours is in the folder.
+              </p>
+            )}
             {gpu && <div className="hint mt-2">{gpu}</div>}
             {test && <div className="notice notice-info mt-2">{test}</div>}
           </>
