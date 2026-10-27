@@ -44,10 +44,31 @@ describe('quick-add', () => {
   });
   it('reads recurrence', () => {
     const q = parseQuickAdd('owe: timesheet every friday', ctx);
-    expect(q.recur).toEqual({ every: 1, unit: 'week' });
+    expect(q.recur).toMatchObject({ every: 1, unit: 'week', days: [5] });
     expect(q.due).toBe('2026-10-16');
     expect(q.title).toBe('Timesheet');
-    expect(parseQuickAdd('monthly report every month by 11/5', ctx).recur).toEqual({ every: 1, unit: 'month' });
+    // "Monthly" in a title is a word, not a schedule; the day comes from the date given.
+    const m = parseQuickAdd('monthly report every month by 11/5', ctx);
+    expect(m.recur).toMatchObject({ every: 1, unit: 'month', monthDay: 5 });
+    expect(m.title).toBe('Monthly report');
+  });
+  it('starts a schedule on its first day from today, today included', () => {
+    // TODAY is a Thursday.
+    expect(parseQuickAdd('owe: status note every mon and thu', ctx)).toMatchObject({ title: 'Status note', due: '2026-10-15', recur: { days: [1, 4] } });
+    expect(parseQuickAdd('owe: site diary every working day', ctx)).toMatchObject({ due: '2026-10-15', recur: { unit: 'day', every: 1 } });
+    // The 1st of November is a Sunday, so that one is due on Friday 30 October.
+    expect(parseQuickAdd('owe: pay the invoice on the 1st of every month', ctx)).toMatchObject({ title: 'Pay the invoice', due: '2026-10-30', recur: { monthDay: 1 } });
+    expect(parseQuickAdd('owe: month-end return every last working day', ctx)).toMatchObject({ due: '2026-10-30', recur: { monthDay: -1 } });
+    // "Every week" said on a Thursday is every Thursday.
+    expect(parseQuickAdd('owe: weekly report every week', ctx).recur).toMatchObject({ unit: 'week', days: [4], from: TODAY });
+  });
+  it('reads when a schedule starts and ends', () => {
+    const q = parseQuickAdd('@Priya regression results every other monday starting 10/26 until 12/21', ctx);
+    expect(q.title).toBe('Regression results');
+    expect(q.due).toBe('2026-10-26');
+    expect(q.recur).toEqual({ every: 2, unit: 'week', days: [1], from: '2026-10-26', until: '2026-12-21' });
+    expect(q.tokens.find((t) => t.kind === 'recur')!.text).toBe('every other monday starting 10/26 until 12/21');
+    expect(parseQuickAdd('owe: look-ahead every monday starting next week', ctx).due).toBe('2026-10-19');
   });
   it('returns every token it read, for the chips', () => {
     const q = parseQuickAdd('@Priya ATS report fri #BART', ctx);

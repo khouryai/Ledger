@@ -1220,7 +1220,7 @@ section + section, .card + section, .notice + section { margin-top: 28px; }
 .today-rail { display: flex; flex-direction: column; gap: 14px; }
 .rail-card { background: var(--card-bg); border: 1px solid var(--line-soft); border-radius: 8px; box-shadow: var(--shadow-sm); padding: 12px 14px; }
 .rail-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.rail-link { font-size: 12px; color: var(--brand-blue); text-decoration: none; }
+.rail-link { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; font-size: 12px; color: var(--brand-blue); text-decoration: none; }
 .rail-link:hover { text-decoration: underline; }
 .rail-list { list-style: none; margin: 0; padding: 0; }
 .rail-list > li + li { border-top: 1px solid var(--gray-100); }
@@ -1397,3 +1397,189 @@ section[id^='s-'] { scroll-margin-top: 16px; }
 .learn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .learn-card { border: 1px solid var(--line-soft); border-radius: 8px; padding: 12px 14px; background: var(--surface-2); }
 @media (max-width: 760px) { .learn-grid { grid-template-columns: 1fr; } }
+
+/* ===========================================================================
+   Recurring items and the week
+   =========================================================================== */
+.recur-label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+
+/* The schedule editor: how often, which days, from and until when. */
+.sched .field { margin-bottom: 12px; }
+.day-picks { display: flex; flex-wrap: wrap; gap: 4px; }
+.day-pick {
+  min-width: 46px;
+  font: 600 12px var(--f-ui);
+  color: var(--text-muted);
+  background: var(--white);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 6px 0;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--easing), border-color var(--dur-fast) var(--easing), color var(--dur-fast) var(--easing);
+}
+.day-pick:hover { border-color: var(--line-strong); color: var(--text); }
+.day-pick.is-off { background: var(--surface-2); color: var(--text-subtle); }
+.day-pick[aria-pressed='true'] { background: var(--hitachi-red); border-color: var(--hitachi-red); color: var(--white); }
+.sched-month { display: flex; flex-direction: column; gap: 8px; }
+.sched-month .check { flex-wrap: wrap; gap: 6px; }
+.sched-month select.input { padding-top: 5px; padding-bottom: 5px; }
+.sched-preview { margin-top: 12px; border: 1px solid var(--info-border); background: var(--info-light); color: var(--info); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; }
+.sched-dates { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sched-dates > span { font-family: var(--f-mono); font-size: 11px; color: var(--text); background: var(--white); border: 1px solid var(--info-border); border-radius: 999px; padding: 2px 8px; }
+
+/* The grid: one row a recurring item, one column a day, a mark for each occurrence. */
+.rgrid-wrap { overflow-x: auto; }
+.rgrid { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.rgrid th, .rgrid td { border-bottom: 1px solid var(--gray-100); padding: 8px 6px; text-align: center; vertical-align: middle; }
+.rgrid tr:last-child > * { border-bottom: 0; }
+.rgrid thead th { font-family: var(--f-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-subtle); background: var(--surface-2); border-bottom-color: var(--line-soft); padding-top: 7px; padding-bottom: 7px; }
+.rgrid thead th b { display: block; font-family: var(--f-display); font-size: 15px; letter-spacing: 0; color: var(--text); text-transform: none; }
+.rgrid thead th.is-today b { color: var(--hitachi-red); }
+.rgrid .is-today { background: var(--hitachi-red-light); }
+.rgrid .rgrid-name { text-align: left; width: 34%; padding-left: 14px; }
+.rgrid tbody .rgrid-name { font-weight: 400; }
+.rgrid-title { display: block; font: 600 13.5px var(--f-ui); color: var(--text); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.rgrid-title:hover { text-decoration: underline; text-underline-offset: 2px; }
+.rgrid-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.rgrid td.rgrid-acts, .rgrid th.rgrid-acts { width: 84px; padding-right: 8px; white-space: nowrap; }
+.rgrid tbody tr:hover > * { background: var(--surface-2); }
+.rgrid tbody tr:hover > .is-today { background: var(--hitachi-red-light); }
+
+.mark {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid var(--gray-300);
+  background: var(--white);
+  color: var(--text-subtle);
+  font: 700 12px var(--f-mono);
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--easing), box-shadow var(--dur-fast) var(--easing);
+}
+button.mark:hover { transform: scale(1.12); box-shadow: var(--shadow-md); }
+.mark-done { background: var(--good); border-color: var(--good); color: var(--white); }
+.mark-late { background: var(--warn-light); border-color: var(--warn-dot); color: var(--warn); }
+.mark-skipped { background: var(--surface-3); border-style: dashed; border-color: var(--gray-400); }
+.mark-dropped { background: var(--surface-3); border-color: var(--gray-300); }
+.mark-due { border: 2px solid var(--hitachi-red); }
+.mark-overdue { background: var(--bad); border-color: var(--bad); color: var(--white); }
+.mark-planned { border-style: dashed; border-color: var(--gray-400); }
+.mark-missed { background: var(--bad-light); border-style: dashed; border-color: var(--bad-dot); }
+.mark-none { display: inline-block; width: 4px; height: 4px; border-radius: 999px; background: var(--gray-200); }
+.mark.is-key { width: 16px; height: 16px; border-width: 1.5px; font-size: 9px; cursor: default; }
+.rgrid-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 11.5px; color: var(--text-muted); }
+.rgrid-key > span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* A recurring item in the list: its schedule in words, its record in dots. */
+.series-when { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 12.5px; color: var(--text); }
+.series-sched { display: inline-flex; align-items: baseline; gap: 6px; }
+.series-sched > svg { flex: none; align-self: center; color: var(--text-subtle); }
+.series-when > .row-person { position: relative; z-index: 1; font-weight: 400; color: var(--text-muted); }
+.dots { display: inline-flex; align-items: center; gap: 3px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: var(--gray-300); flex: none; }
+.dot-done { background: var(--good-dot); }
+.dot-late { background: var(--warn-dot); }
+.dot-skipped { background: transparent; box-shadow: inset 0 0 0 1.5px var(--gray-400); }
+.dot-dropped { background: var(--gray-400); }
+.occ-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
+.occ-list li { display: flex; align-items: center; gap: 8px; }
+
+/* The week: a column a day. */
+.week-nav { display: inline-flex; }
+.week-nav .btn { text-decoration: none; border-radius: 0; margin-left: -1px; }
+.week-nav .btn:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.week-nav .btn:last-child { border-radius: 0 8px 8px 0; }
+.week-nav .btn.is-on { background: var(--surface-3); }
+.week-board { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 10px; align-items: start; }
+.wday { display: flex; flex-direction: column; min-height: 150px; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 8px; transition: border-color var(--dur-fast) var(--easing), background var(--dur-fast) var(--easing); }
+.wday.is-today { border-color: rgba(230, 0, 18, 0.35); box-shadow: inset 0 3px 0 var(--hitachi-red); }
+.wday.is-past { background: var(--surface-3); }
+.wday.is-off { background: var(--gray-100); }
+.wday.is-over { border-color: var(--hitachi-red); background: var(--hitachi-red-light); }
+.wday-h { display: flex; align-items: baseline; gap: 6px; padding: 8px 10px 6px; border-bottom: 1px solid var(--line-soft); }
+.wday-name { font-family: var(--f-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-subtle); }
+.wday-date { font-family: var(--f-display); font-size: 18px; font-weight: 700; line-height: 1; color: var(--text); }
+.wday.is-today .wday-date { color: var(--hitachi-red); }
+.wday.is-past .wday-date { color: var(--text-muted); }
+.wday-tag { font-family: var(--f-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hitachi-red-hover); background: var(--hitachi-red-light); border-radius: 999px; padding: 2px 6px; }
+.wday-tag.is-off { color: var(--text-muted); background: var(--surface-3); }
+.wday-n { margin-left: auto; font-family: var(--f-mono); font-size: 10px; color: var(--text-subtle); }
+.wday-list { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.wday-empty { font-size: 12px; color: var(--text-subtle); text-align: center; padding: 14px 0; }
+
+.wcard { position: relative; background: var(--surface); border: 1px solid var(--line-soft); border-left: 3px solid var(--gray-300); border-radius: 7px; padding: 6px 6px 4px 9px; box-shadow: var(--shadow-sm); transition: box-shadow var(--dur-fast) var(--easing), border-color var(--dur-fast) var(--easing); }
+.wcard:hover { box-shadow: var(--shadow-md); }
+.wcard:has(.wcard-open:focus-visible) { outline: var(--focus-ring); outline-offset: 1px; }
+.wcard-due { border-left-color: var(--hitachi-red); }
+.wcard-due.is-late { background: var(--bad-light); }
+.wcard-promise { border-left-color: var(--info-dot); }
+.wcard-chase { border-left-color: var(--warn-dot); }
+.wcard-planned { background: transparent; box-shadow: none; border-style: dashed; border-left-style: solid; border-left-color: var(--gray-400); }
+.wcard-closed { background: transparent; box-shadow: none; border-left-color: var(--good-dot); }
+.wcard-closed .wcard-title { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.wcard.is-movable { cursor: grab; }
+.wcard.is-movable:active { cursor: grabbing; }
+.wcard-open { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.wcard-open:focus-visible { outline: none; }
+.wcard-open::after { content: ''; position: absolute; inset: 0; }
+.wcard.is-movable .wcard-open { cursor: inherit; }
+.wcard-kind { display: block; font-family: var(--f-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); }
+.wcard-due .wcard-kind { color: var(--hitachi-red-hover); }
+.wcard-promise .wcard-kind { color: var(--info); }
+.wcard-chase .wcard-kind { color: var(--warn); }
+.wcard-closed .wcard-kind { color: var(--good); }
+.wcard-title { display: block; margin-top: 1px; font-size: 12.5px; font-weight: 600; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.wcard-foot { display: flex; align-items: center; gap: 4px; min-height: 24px; }
+.wcard-sub { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 0 6px; min-width: 0; font-size: 11px; line-height: 1.35; color: var(--text-muted); }
+.wcard-who { font-weight: 600; color: var(--text); }
+.wcard-acts { position: relative; z-index: 1; display: flex; flex: none; }
+.wcard-acts .ico-btn { width: 26px; height: 26px; }
+.week-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; margin-top: 28px; }
+.week-more > section + section { margin-top: 0; }
+.week-more .wday-list { padding: 0; }
+
+/* A checklist on an item. */
+.steps { list-style: none; margin: 0 0 8px; padding: 0; }
+.steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 1px 0; }
+.steps input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--hitachi-red); cursor: pointer; }
+.step-text { width: 100%; font: 500 13px var(--f-ui); color: var(--text); background: none; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; }
+.step-text:hover { border-color: var(--border-strong); }
+.step-text:focus { outline: none; border-color: rgba(230, 0, 18, 0.45); box-shadow: var(--ring); background: var(--white); }
+.steps li.is-done .step-text { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.step-acts { display: flex; opacity: 0.45; transition: opacity var(--dur-fast) var(--easing); }
+.steps li:hover .step-acts, .steps li:focus-within .step-acts { opacity: 1; }
+.step-acts .ico-btn { width: 26px; height: 26px; }
+
+@media (max-width: 1100px) {
+  .week-board { grid-template-columns: minmax(0, 1fr); }
+  .wday { min-height: 0; }
+  .week-more { grid-template-columns: minmax(0, 1fr); }
+  .week-more > section + section { margin-top: 28px; }
+}
+@media (max-width: 760px) {
+  .rgrid .rgrid-name { width: 38%; padding-left: 10px; }
+  .rgrid th, .rgrid td { padding-left: 2px; padding-right: 2px; }
+  /* The row opens the item, and the marks open each one: the buttons can go. */
+  .rgrid .rgrid-acts { display: none; }
+  .step-acts { opacity: 1; }
+  .day-pick { min-width: 40px; padding: 9px 0; }
+  .week-nav .btn { padding-left: 10px; padding-right: 10px; }
+}
+
+/* Today's side column: the week at a glance. */
+.rail-week { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+.rail-wday { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 0 5px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); text-decoration: none; transition: border-color var(--dur-fast) var(--easing); }
+.rail-wday:hover { border-color: var(--line-strong); }
+.rail-wday > span { font-family: var(--f-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); }
+.rail-wday > b { font-size: 15px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.rail-wday.is-today { border-color: rgba(230, 0, 18, 0.35); background: var(--hitachi-red-light); }
+.rail-wday.is-today > b { color: var(--hitachi-red); }
+.rail-wday.is-past > b { color: var(--text-subtle); }
+.rail-wday.is-off { background: var(--gray-100); }
+.rail-routines { display: block; margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); text-decoration: none; font-size: 12.5px; font-weight: 600; }
+.rail-routines:hover { border-color: var(--line-strong); }
+.rail-routines .progress { display: block; }

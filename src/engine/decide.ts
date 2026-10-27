@@ -9,7 +9,8 @@
  */
 import { addWorkingDays, fmtDay, maxDay, plural, workingDaysBetween, type Calendar } from './dates';
 import { firstName } from './people';
-import { chasesSinceMovement, lastChase, lastMovement, lastResponse, lastTouch, personStats, type PersonStats } from './stats';
+import { allSeries, outcome } from './series';
+import { chasesSinceMovement, lastChase, lastMovement, lastResponse, lastTouch, median, personStats, type PersonStats } from './stats';
 import type { ChaseLevel, Day, Item, LedgerDoc, Person, Settings } from './types';
 
 export type Ctx = {
@@ -65,8 +66,9 @@ export function age(it: Item, ctx: Ctx): Age {
   const s = ctx.doc.settings;
   const waited = Math.max(0, workingDaysBetween(it.askedOn, ctx.today, ctx.cal));
   const idle = Math.max(0, workingDaysBetween(lastTouch(it), ctx.today, ctx.cal));
-  if (it.status !== 'open') return { waited, idle, tone: 'muted', label: it.status === 'done' ? (it.direction === 'wait' ? 'Received' : 'Done') : 'Dropped' };
-  if (it.direction === 'owe') {
+  if (it.status !== 'open') return { waited, idle, tone: 'muted', label: it.status === 'done' ? (it.direction === 'wait' ? 'Received' : 'Done') : it.history.some((h) => h.kind === 'skipped') ? 'Skipped' : 'Dropped' };
+  // A recurring delivery is due on its schedule: it is not "waiting" before its day.
+  if (it.direction === 'owe' || (it.recur && it.due)) {
     if (!it.due) return { waited, idle, tone: 'muted', label: 'No deadline' };
     const left = workingDaysBetween(ctx.today, it.due, ctx.cal);
     if (it.due < ctx.today) return { waited, idle, tone: 'bad', label: `Overdue ${plural(-left || 1, 'day')}` };
@@ -192,7 +194,9 @@ export function risk(it: Item, ctx: Ctx): Risk | null {
 export type Suggestion =
   | { kind: 'escalate'; itemId: string; reason: string }
   | { kind: 'dead'; itemId: string; reason: string }
-  | { kind: 'risk'; itemId: string; reason: string };
+  | { kind: 'risk'; itemId: string; reason: string }
+  | { kind: 'slipping'; itemId: string; reason: string }
+  | { kind: 'unneeded'; itemId: string; reason: string };
 
 export function looksDead(it: Item, ctx: Ctx): string | null {
   if (it.direction !== 'wait' || it.status !== 'open' || isSnoozed(it, ctx.today)) return null;
@@ -223,6 +227,19 @@ export function suggestions(ctx: Ctx): Suggestion[] {
     }
     const r = risk(it, ctx);
     if (r?.level === 'risk') out.push({ kind: 'risk', itemId: it.id, reason: r.reason });
+  }
+  // A recurring item whose record says its schedule does not fit: done late most of
+  // the last four times, or skipped most of them. Only with three or more to go on.
+  for (const s of allSeries(ctx.doc)) {
+    if (!s.active || !s.current) continue;
+    const last = s.items.filter((i) => i.status !== 'open').slice(-4);
+    if (last.length < 3) continue;
+    const late = last.filter((i) => outcome(i) === 'late');
+    const skipped = last.filter((i) => outcome(i) === 'skipped').length;
+    if (late.length >= 3) {
+      const by = Math.round(median(late.map((i) => workingDaysBetween(i.due!, i.closedOn!, ctx.cal))) ?? 1);
+      out.push({ kind: 'slipping', itemId: s.current.id, reason: `Done late ${late.length} of the last ${last.length} times, usually ${plural(by, 'working day')} after its day` });
+    } else if (skipped >= 3) out.push({ kind: 'unneeded', itemId: s.current.id, reason: `Skipped ${skipped} of the last ${last.length} times` });
   }
   return out;
 }

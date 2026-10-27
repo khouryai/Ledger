@@ -4,6 +4,7 @@
 import { addDays, fmtDay, mondayOf, plural, weekday, workingDaysBetween } from './dates';
 import { age, isSnoozed, type Ctx } from './decide';
 import { firstName, normName } from './people';
+import { outcome } from './series';
 import { eventDay, lastTouch } from './stats';
 import type { Day, Item, LedgerDoc, Meeting } from './types';
 
@@ -15,7 +16,8 @@ import type { Day, Item, LedgerDoc, Meeting } from './types';
 export function reviewQueue(ctx: Ctx): Item[] {
   const n = ctx.doc.settings.review.staleAfter;
   return ctx.doc.items
-    .filter((it) => it.status === 'open' && !isSnoozed(it, ctx.today))
+    // A recurring one waiting for its day has not gone quiet; it is on schedule.
+    .filter((it) => it.status === 'open' && !isSnoozed(it, ctx.today) && !(it.recur && it.due && it.due >= ctx.today))
     .map((it) => ({ it, idle: workingDaysBetween(lastTouch(it), ctx.today, ctx.cal) }))
     .filter((x) => x.idle >= n)
     .sort((a, b) => b.idle - a.idle || a.it.num - b.it.num)
@@ -42,6 +44,8 @@ export type WeekSummary = {
   waiting: Item[];
   oldestWaiting?: { item: Item; days: number };
   owesMost: { personId: string; name: string; count: number }[];
+  /** Occurrences of recurring items due this week so far, and how many were done or skipped. */
+  recurring: { due: number; done: number; skipped: number };
 };
 
 export function weekSummary(ctx: Ctx): WeekSummary {
@@ -63,10 +67,12 @@ export function weekSummary(ctx: Ctx): WeekSummary {
     .map(([personId, count]) => ({ personId, count, name: ctx.doc.people.find((p) => p.id === personId)?.name ?? 'Unknown' }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
     .slice(0, 3);
+  const occurrences = items.filter((i) => (i.recur || i.seriesId) && inWeek(i.due));
   return {
     from,
     to,
-    opened: items.filter((i) => inWeek(created(i))),
+    // The next occurrence of something recurring is not new work: the first one was.
+    opened: items.filter((i) => inWeek(created(i)) && !(i.seriesId && i.seriesId !== i.id)),
     done: items.filter((i) => i.status === 'done' && i.direction === 'owe' && inWeek(i.closedOn)),
     received: items.filter((i) => i.status === 'done' && i.direction === 'wait' && inWeek(i.closedOn)),
     dropped: items.filter((i) => i.status === 'dropped' && inWeek(i.closedOn)),
@@ -74,6 +80,11 @@ export function weekSummary(ctx: Ctx): WeekSummary {
     waiting,
     oldestWaiting: oldest,
     owesMost,
+    recurring: {
+      due: occurrences.length,
+      done: occurrences.filter((i) => i.status === 'done').length,
+      skipped: occurrences.filter((i) => outcome(i) === 'skipped').length,
+    },
   };
 }
 
@@ -89,6 +100,7 @@ export function weekSummaryText(s: WeekSummary, ctx: Ctx): string {
     `Opened: ${s.opened.length}. Closed: ${s.done.length + s.received.length} (${s.done.length} done, ${s.received.length} received)${s.dropped.length ? `, ${s.dropped.length} dropped` : ''}.`,
     `Still waiting on others: ${s.waiting.length}. Overdue from me: ${s.overdue.length}.`,
   ];
+  if (s.recurring.due) lines.push(`Recurring: ${s.recurring.done} of ${s.recurring.due} done${s.recurring.skipped ? `, ${s.recurring.skipped} skipped` : ''}.`);
   if (s.oldestWaiting) lines.push(`Oldest wait: "${s.oldestWaiting.item.title}"${name(s.oldestWaiting.item)}, ${plural(s.oldestWaiting.days, 'working day')}.`);
   if (s.owesMost.length) lines.push(`Most outstanding: ${s.owesMost.map((x) => `${x.name} (${x.count})`).join(', ')}.`);
   if (s.done.length || s.received.length) {
@@ -117,8 +129,13 @@ export function sessionItems(meeting: Meeting, sessionId: string, doc: LedgerDoc
 
 // ── Search ──────────────────────────────────────────────────────────────────
 
-/** Every word must appear somewhere in the item: title, person, tags, notes, source, number. */
+/**
+ * Every word must appear somewhere in the item: title, person, tags, notes, source,
+ * number. "#12" on its own is item 12 and nothing else: not #120, not a date with 12 in it.
+ */
 export function matches(it: Item, query: string, doc: LedgerDoc): boolean {
+  const ref = /^\s*#(\d+)\s*$/.exec(query);
+  if (ref) return it.num === Number(ref[1]);
   const q = normName(query);
   if (!q) return true;
   const p = doc.people.find((x) => x.id === it.personId);

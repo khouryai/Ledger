@@ -13,6 +13,8 @@
  *   either device recorded is lost, and person statistics stay honest.
  * - Lists of ids and words (tags, links, needs, attendees, dismissed messages) merge
  *   as sets: added on either side is kept, removed on either side is removed.
+ * - A checklist merges step by step, so a step ticked on one device and another
+ *   ticked on the other are both ticked.
  * - Something deleted on one side and untouched on the other is deleted. Something
  *   deleted on one side and edited on the other is kept: an edit is a statement that
  *   it still matters.
@@ -21,7 +23,7 @@
  *
  * Pure: no clock except the `now` passed in, no I/O.
  */
-import type { HistoryEvent, Item, LedgerDoc, Meeting, MeetingSession, Person, Settings } from './types';
+import type { HistoryEvent, Item, LedgerDoc, Meeting, MeetingSession, Person, Settings, Step } from './types';
 
 export type MergeResult = {
   doc: LedgerDoc;
@@ -131,13 +133,15 @@ const ITEM_SETS = ['tags', 'links', 'blockedBy'] as const;
 /** An item without the parts merged on their own terms, so they are not counted as clashes. */
 function fields(it: Item | undefined): Obj | undefined {
   if (!it) return undefined;
-  const { tags: _t, links: _l, blockedBy: _b, history: _h, updatedAt: _u, ...rest } = it;
+  const { tags: _t, links: _l, blockedBy: _b, history: _h, updatedAt: _u, steps: _s, ...rest } = it;
   return rest;
 }
 
 function mergeItem(b: Item | undefined, m: Item, t: Item, tally: Tally): Item {
   const out = { ...(deep(fields(b), fields(m), fields(t), tally) as Item) };
   for (const k of ITEM_SETS) out[k] = mergeSet(b?.[k], m[k], t[k]);
+  const steps = byId(b?.steps ?? [], m.steps ?? [], t.steps ?? [], (bs, ms, ts) => deep(bs, ms, ts, tally) as Step);
+  if (steps.length) out.steps = steps;
   out.history = mergeHistory(m.history, t.history);
   out.updatedAt = m.updatedAt > t.updatedAt ? m.updatedAt : t.updatedAt;
   return out;

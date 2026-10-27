@@ -88,12 +88,48 @@ forgotten and chasing is one click.
 - [x] Flagged emails as things I owe. Today's meetings into meeting mode.
 - [x] Dismissed and already-tracked messages never suggested again.
 
+### 6. Recurring items and the week
+
+Asked for on 26 October 2026: recurring tasks defined clearly, to view and manage on a
+weekly basis, and the interface improved.
+
+- [x] Schedules held to their own days (`engine/recur.ts`): every N working days; weekly
+  on any days; every other week and every N weeks, on the weeks they started on; monthly
+  on a day (the last of a shorter month), on the last working day, or on the first to
+  fourth or last of a weekday; every N months; an end date. A date on a day off is due the
+  working day before and the next goes back to the schedule. The old rule counted on
+  from the moved date and drifted.
+- [x] The schedule in words everywhere, and in the add line: `every mon and thu`,
+  `every other tuesday`, `every month end`, `the first monday of every month`,
+  `until 12/18`, `starting next week`. "Weekly report" is still a title.
+- [x] Series: each occurrence is an item, linked by `seriesId`; chains from older files
+  linked by their "Recurs: next after #N" line. A record counted from them: on time,
+  late, skipped, in a row.
+- [x] Close one and the next goes on the list: the schedule's next day, not before today
+  (unless each one is owed, which is a setting), with the dates passed over named in its
+  history. Skip one; pause until a date; change the schedule (the one in hand moves only
+  when its days change); stop repeating; start an ended one again.
+- [x] Recurring screen: this week's grid, each item with its schedule, next date and
+  record, and a form that shows the dates before anything is added.
+- [x] Week screen: a column a day with deadlines, promises, chases, recurring items and
+  what got done; overdue and undated underneath; drag to move a deadline or a chase,
+  or Move from a menu; copy the week as lines.
+- [x] Steps (a checklist) on any item, ticks in the history, merged step by step across
+  devices, and unticked on a recurring item's next one.
+- [x] Weekly review: suggests a new schedule for one usually late and asks about one
+  usually skipped; Plan next week. Recurring ones waiting for their day are not "quiet".
+- [x] Today: done today, and the week at a glance. Number keys for the main screens.
+- [x] A recurring delivery counts as a promise kept or missed, not towards how long a
+  person takes: it falls due on its schedule, not some days after it was asked for.
+
 ## Left out on purpose
 
 - Team mode, sharing, accounts.
 - Sending email from the app.
 - Priority matrices: due dates and Today do that job.
 - Background reminders: the app runs no service. Start it at log-on instead.
+- A calendar file (.ics) of the recurring items: a copy outside the ledger would not
+  know when one was done, skipped or moved, and would go stale the first week.
 
 ## Not yet done, and why
 

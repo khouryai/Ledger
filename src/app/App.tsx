@@ -6,11 +6,13 @@ import { Setup } from './screens/Setup';
 import { SignIn } from './screens/SignIn';
 import { Today } from './screens/Today';
 import { Items } from './screens/Items';
+import { Week } from './screens/Week';
 
 /*
- * Today and the lists load with the app; everything else when first opened. The
- * single-file build inlines all of it, so it is the same either way there.
+ * Today, the week and the lists load with the app; everything else when first
+ * opened. The single-file build inlines all of it, so it is the same either way there.
  */
+const Recurring = lazy(() => import('./screens/Recurring').then((m) => ({ default: m.Recurring })));
 const People = lazy(() => import('./screens/People').then((m) => ({ default: m.People })));
 const Meetings = lazy(() => import('./screens/Meetings').then((m) => ({ default: m.Meetings })));
 const Capture = lazy(() => import('./screens/Capture').then((m) => ({ default: m.Capture })));
@@ -33,6 +35,12 @@ function Shell() {
     case 'wait':
     case 'all':
       screen = <Items route={route} />;
+      break;
+    case 'week':
+      screen = <Week route={route} />;
+      break;
+    case 'recurring':
+      screen = <Recurring route={route} />;
       break;
     case 'people':
       screen = <People route={route} />;

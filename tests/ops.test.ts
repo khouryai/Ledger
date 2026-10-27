@@ -46,15 +46,22 @@ describe('items', () => {
     expect(r.spawned).toMatchObject({ title: 'Timesheet', due: '2026-10-23', status: 'open' });
     expect(doc.items.length).toBe(2);
   });
-  it('moves a monthly recurrence back to a working day', () => {
+  it('moves a monthly recurrence back to a working day, and back to its day after', () => {
     let { doc, item } = add(docWith(), { title: 'Report', direction: 'owe', due: '2026-10-05', recur: { every: 1, unit: 'month' } });
     const r = complete(doc, item.id, undefined, at('2026-10-05'));
     // 5 Nov 2026 is a Thursday.
     expect(r.spawned!.due).toBe('2026-11-05');
-    ({ doc, item } = add(docWith(), { title: 'Report', direction: 'owe', due: '2026-09-07', recur: { every: 1, unit: 'month' } }));
-    // 7 Nov 2026 is a Saturday, so the Friday before.
+    ({ doc, item } = add(docWith(), { title: 'Report', direction: 'owe', due: '2026-10-07', recur: { every: 1, unit: 'month' } }));
+    // 7 Nov 2026 is a Saturday, so the Friday before…
     const r2 = complete(doc, item.id, undefined, at('2026-10-07'));
     expect(r2.spawned!.due).toBe('2026-11-06');
+    // …and December's is on the 7th again, not the 6th: it does not drift.
+    expect(complete(r2.doc, r2.spawned!.id, undefined, at('2026-11-06')).spawned!.due).toBe('2026-12-07');
+  });
+  it('after one closed late, the next is the first still to come, today included', () => {
+    const { doc, item } = add(docWith(), { title: 'Report', direction: 'owe', due: '2026-09-07', recur: { every: 1, unit: 'month' } });
+    // September's, done on 7 October: October's is due that same day.
+    expect(complete(doc, item.id, undefined, at('2026-10-07')).spawned!.due).toBe('2026-10-07');
   });
   it('refuses a blocked-by loop', () => {
     let doc = docWith();

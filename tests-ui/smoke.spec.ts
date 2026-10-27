@@ -248,7 +248,7 @@ test('the command menu finds an item by number and opens it', async ({ page }) =
 
 test('every screen renders without an error', async ({ page }) => {
   const errors = watch(page);
-  for (const s of ['today', 'owe', 'wait', 'all', 'capture', 'meetings', 'review', 'people', 'settings']) {
+  for (const s of ['today', 'week', 'owe', 'wait', 'recurring', 'all', 'capture', 'meetings', 'review', 'people', 'settings']) {
     await page.goto(`/?demo=1#/${s}`);
     await expect(page.locator('.ph-title')).toBeVisible();
   }

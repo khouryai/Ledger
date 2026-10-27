@@ -117,7 +117,11 @@ function PersonCard({ person }: { person: Person }) {
       ...theyOwe.map(line),
       `I owe them (${iOwe.length}):`,
       ...iOwe.map(line),
-      st.samples ? `Record: ${st.samples} received before, usually in ${st.deliveryDays} working days${st.promisesKept !== null ? `, ${Math.round(st.promisesKept * 100)}% of promises kept` : ''}.` : 'Record: nothing received from them yet.',
+      st.samples
+        ? `Record: ${st.samples} received before, usually in ${st.deliveryDays} working days${st.promisesKept !== null ? `, ${Math.round(st.promisesKept * 100)}% of promises kept` : ''}.${st.recurring ? ` And ${st.recurring} on a schedule.` : ''}`
+        : st.recurring
+          ? `Record: ${st.recurring} received on a schedule; nothing asked of them received yet.`
+          : 'Record: nothing received from them yet.',
     ].join('\n');
   };
 
@@ -128,7 +132,11 @@ function PersonCard({ person }: { person: Person }) {
           <div className="min-w-0 flex-1">
             <CommitInput className="title-edit" value={person.name} onCommit={(v) => v.trim() && set({ name: v.trim() })} ariaLabel="Name" />
             <div className="mt-1 flex flex-wrap gap-2">
-              <Badge tone={st.learned ? 'purple' : 'muted'} title={st.learned ? 'Their own pattern is used for chasing and for expecting arrivals' : `The defaults apply until ${s.learnAfter} items have been received from them`}>
+              <Badge tone={st.learned ? 'purple' : 'muted'} title={
+                  st.learned
+                    ? 'Their own pattern is used for chasing and for expecting arrivals'
+                    : `The defaults apply until ${s.learnAfter} things you asked for have been received from them. Recurring deliveries come on a schedule, so they do not count.`
+                }>
                 {st.learned ? `Learned from ${st.samples} items` : `${st.samples} of ${s.learnAfter} items to learn from`}
               </Badge>
               <span className="hint">Chase rhythm: {r.reason}.</span>
@@ -178,7 +186,7 @@ function PersonCard({ person }: { person: Person }) {
         )}
 
         <div className="mt-4 grid grid-cols-4 gap-3">
-          <Fact label="Received" value={String(st.samples)} />
+          <Fact label="Received" value={String(st.samples + st.recurring)} />
           <Fact label="Usually takes" value={st.deliveryDays !== null ? `${st.deliveryDays} days` : '—'} />
           <Fact label="Promises kept" value={st.promisesKept !== null ? `${Math.round(st.promisesKept * 100)}%` : '—'} sub={st.promised ? `of ${st.promised}` : undefined} />
           <Fact label="Chases needed" value={st.chasesNeeded !== null ? String(st.chasesNeeded) : '—'} sub="median" />

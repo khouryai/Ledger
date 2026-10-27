@@ -1,7 +1,7 @@
 /* Generated at build time. Precache the app shell so the window opens instantly with no network. */
-const VERSION = 'mvitqfwp';
+const VERSION = 'mvpyjjwn';
 const CACHE = `ledger-${VERSION}`;
-const PRECACHE = ["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","assets/archivo-latin-wght-normal-E0tuGl4L.woff2","assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2","assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2","assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2","assets/index-CV3aKRqu.css","assets/People-Bzg5fcMO.js","assets/Meetings-CuqpaxVI.js","assets/Capture-CDYggCls.js","assets/Review-Dhl_P8Jp.js","assets/Outlook-WjqxuXwN.js","assets/email-C22mIrw-.js","assets/Settings-DjVmINdF.js","assets/xlsx-DArbZi3W.js","assets/fakeApi-c87G1C5n.js","assets/fake-YOAUGxae.js","assets/webllm-DnEHPmq5.js","assets/index-BI-C95S3.js","assets/msg-7rXHQLH1.js"];
+const PRECACHE = ["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","assets/archivo-latin-wght-normal-E0tuGl4L.woff2","assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2","assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2","assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2","assets/index-DXRBkNIK.css","assets/Recurring-BDdiEQzh.js","assets/People-WfQNnRZx.js","assets/Meetings-C26ErSJE.js","assets/Capture-B51DRoR1.js","assets/Review-CeD7j0Mm.js","assets/Outlook-BjsDbuoY.js","assets/email-B9iO9obq.js","assets/Settings-BKbdFgJ3.js","assets/xlsx-DDU9BE2N.js","assets/fakeApi-N3_Iw0PS.js","assets/fake-BtlfeWrw.js","assets/webllm-DJKOi-jC.js","assets/index-BI-C95S3.js","assets/msg-C7tscPRt.js"];
 // Where the app lives: the root on the laptop, /Ledger/ on GitHub Pages.
 const SCOPE = new URL(self.registration.scope).pathname;
 const SHELL = new URL('index.html', self.registration.scope).href;

@@ -6,10 +6,12 @@ import { useEffect, useState } from 'react';
 import { useAiStatus } from '../../ai/manager';
 import { age, chasePlan, expectedArrival, isSnoozed, risk } from '../../engine/decide';
 import { learn, judgeReply, type ReplyLabel } from '../../engine/learn';
-import { addNote, addPerson, calendarOf, complete, drop, link, recordPromise, reopen, unlink, updateItem, levelWord, wouldCycle, type ItemPatch } from '../../engine/ops';
+import { addNote, addPerson, addStep, calendarOf, complete, drop, link, moveStep, recordPromise, removeStep, renameStep, reopen, toggleStep, unlink, updateItem, levelWord, wouldCycle, type ItemPatch } from '../../engine/ops';
+import { describeRecurrence, nextOccurrence, ruleOf } from '../../engine/recur';
 import { checkReplyRules, type ReplyCheck } from '../../engine/reply';
+import { occurrenceDay, outcome, seriesOf } from '../../engine/series';
 import { personStats } from '../../engine/stats';
-import type { Item, LedgerDoc, Recurrence } from '../../engine/types';
+import type { Item, LedgerDoc } from '../../engine/types';
 import { useAi } from '../ai';
 import { useLearned } from '../learning';
 import { fmtWhen, makeFmt } from '../format';
@@ -18,6 +20,7 @@ import { useApp } from '../state';
 import { CommitInput, DateField, PersonField } from './fields';
 import { Icon } from './icons';
 import { snoozeChoices, useItemActions } from './ItemRow';
+import { RecurLabel } from './Schedule';
 import { Avatar, Badge, IconButton, MenuButton, Modal } from './ui';
 
 export function ItemDrawer() {
@@ -109,7 +112,8 @@ function Body({ item }: { item: Item }) {
     }
   };
 
-  const recurValue = item.recur ? `${item.recur.every}:${item.recur.unit}` : '';
+  const rule = ruleOf(item);
+  const series = seriesOf(doc, item);
 
   const dirWord = item.direction === 'owe' ? 'I owe' : 'Waiting on';
   const isOpen = item.status === 'open';
@@ -130,6 +134,7 @@ function Body({ item }: { item: Item }) {
               {dirWord} · #{item.num}
             </span>
             <Badge tone={ag.tone}>{ag.label}</Badge>
+            {rule && <RecurLabel recur={rule} className="hint" />}
           </div>
           <IconButton icon="x" label="Close (Esc)" onClick={() => actions.setUi({ openItem: null })} />
         </div>
@@ -231,11 +236,17 @@ function Body({ item }: { item: Item }) {
               <div className="hint mt-2">
                 {st.samples > 0
                   ? `${person.name.split(' ')[0]} has delivered ${st.samples} before: usually in ${st.deliveryDays} working days${st.promisesKept !== null ? `, ${Math.round(st.promisesKept * 100)}% of promises kept` : ''}.`
-                  : `Nothing received from ${person.name.split(' ')[0]} yet, so the defaults apply.`}
+                  : st.recurring > 0
+                    ? `${person.name.split(' ')[0]} has sent ${st.recurring} on a schedule but nothing you asked for yet, so the defaults apply.`
+                    : `Nothing received from ${person.name.split(' ')[0]} yet, so the defaults apply.`}
               </div>
             )}
           </section>
         )}
+
+        {series && <Repeats item={item} />}
+
+        {(isOpen || item.steps) && <Steps item={item} />}
 
         <section className="d-sec" aria-labelledby="d-details">
           <h3 className="d-h" id="d-details">
@@ -275,28 +286,22 @@ function Body({ item }: { item: Item }) {
                 onCommit={(v) => patch({ tags: [...new Set(v.split(/[\s,]+/).map((t) => t.replace(/^#/, '')).filter(Boolean))] })}
               />
             </label>
-            <label className="field block">
+            <div className="field">
               <span className="field-l">Repeats</span>
-              <select
-                className="input w-full"
-                value={recurValue}
-                onChange={(e) => {
-                  const [n, u] = e.target.value.split(':');
-                  patch({ recur: e.target.value ? ({ every: Number(n), unit: u } as Recurrence) : undefined });
-                }}
-              >
-                <option value="">Does not repeat</option>
-                <option value="1:day">Every working day</option>
-                <option value="1:week">Every week</option>
-                <option value="2:week">Every two weeks</option>
-                <option value="1:month">Every month</option>
-                {recurValue && !['1:day', '1:week', '2:week', '1:month'].includes(recurValue) && (
-                  <option value={recurValue}>
-                    Every {item.recur!.every} {item.recur!.unit}s
-                  </option>
-                )}
-              </select>
-            </label>
+              {rule && isOpen ? (
+                <button type="button" className="btn btn-mini" onClick={() => a.schedule(item)} data-testid="drawer-schedule">
+                  <Icon name="repeat" size={12} /> {describeRecurrence(rule, { order: s.dateOrder, today: state.today })}
+                </button>
+              ) : rule ? (
+                <span className="hint">{describeRecurrence(rule, { order: s.dateOrder, today: state.today })}</span>
+              ) : isOpen ? (
+                <button type="button" className="btn btn-mini" onClick={() => a.schedule(item)} data-testid="drawer-make-repeat">
+                  <Icon name="repeat" size={12} /> Make it repeat…
+                </button>
+              ) : (
+                <span className="hint">Does not repeat</span>
+              )}
+            </div>
           </div>
           {item.source && (
             <div className="hint">
@@ -593,7 +598,161 @@ export function historyWord(kind: Item['history'][number]['kind'], it: Item): st
       return 'Linked';
     case 'unlinked':
       return 'Unlinked';
+    case 'skipped':
+      return 'Skipped';
+    case 'step':
+      return 'Step';
     default:
       return 'Changed';
   }
+}
+
+/**
+ * A recurring item's schedule and record: what comes after this one if it is closed
+ * now, how the series has gone, the occurrences before it, and what can be done to
+ * the series from here.
+ */
+function Repeats({ item }: { item: Item }) {
+  const { state, ctx, actions } = useApp();
+  const doc = state.doc;
+  const fmt = makeFmt(doc.settings.dateOrder, state.today, ctx.cal);
+  const a = useItemActions();
+  const series = seriesOf(doc, item)!;
+  const rule = ruleOf(item);
+  const isOpen = item.status === 'open';
+  // What closing it now would put on the list: the same reckoning as complete().
+  const next = rule && isOpen ? nextOccurrence(rule, item.due ?? state.today, ctx.cal, rule.catchUp ? undefined : state.today) : null;
+  const then = rule && next ? nextOccurrence(rule, next, ctx.cal) : null;
+  const r = series.record;
+  const past = series.items.filter((i) => i.id !== item.id && i.status !== 'open').slice(-6).reverse();
+  const WORD = { done: 'Done on time', late: 'Done late', skipped: 'Skipped', dropped: 'Dropped' } as const;
+  return (
+    <section className="d-sec" aria-labelledby="d-repeats" data-testid="drawer-repeats">
+      <h3 className="d-h" id="d-repeats">
+        Repeats
+      </h3>
+      <div className="plan">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <b>{rule ? describeRecurrence(rule, { order: doc.settings.dateOrder, today: state.today }) : 'No longer repeats'}</b>
+          {rule && isOpen && (
+            <button type="button" className="link text-[12px]" onClick={() => a.schedule(item)}>
+              Change the schedule
+            </button>
+          )}
+          {!isOpen && series.current && series.current.id !== item.id && (
+            <button type="button" className="link text-[12px]" onClick={() => actions.setUi({ openItem: series.current!.id })}>
+              Open the one in hand
+            </button>
+          )}
+        </div>
+        {isOpen && rule && (
+          <div className="hint mt-1">
+            {next ? `Close this one and the next is due ${fmt.both(next)}${then ? `, then ${fmt.day(then)}` : ''}.` : 'This is the last one: the schedule ends with it.'}
+            {rule.catchUp ? ' Each one is owed, even when one is late.' : ' One closed late is followed by the first still to come.'}
+          </div>
+        )}
+        {r.done + r.skipped > 0 && (
+          <div className="plan-line">
+            <Icon name="check" size={13} /> On time {r.onTime} of {r.done}
+            {r.late ? `, ${r.late} late` : ''}
+            {r.skipped ? `, ${r.skipped} skipped` : ''}
+            {r.streak > 1 ? `. ${r.streak} on time in a row.` : '.'}
+          </div>
+        )}
+        {isOpen && rule && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="btn btn-mini" onClick={() => a.skip(item)} data-testid="drawer-skip">
+              <Icon name="skip" size={12} /> Skip this one
+            </button>
+            <button type="button" className="btn btn-mini" onClick={() => a.pause(item)}>
+              <Icon name="pause" size={12} /> Pause until…
+            </button>
+            <button
+              type="button"
+              className="btn btn-mini"
+              onClick={() => actions.apply((d) => updateItem(d, item.id, { recur: undefined }, new Date()), `#${item.num} no longer repeats. It stays on your list as a one-off.`)}
+            >
+              Stop repeating
+            </button>
+          </div>
+        )}
+        {!series.active && !isOpen && series.head.id === item.id && (
+          <button type="button" className="btn btn-mini mt-2" onClick={() => actions.setUi({ schedule: { kind: 'restart', seriesId: series.id } })}>
+            <Icon name="repeat" size={12} /> Start it again
+          </button>
+        )}
+      </div>
+      {past.length > 0 && (
+        <ul className="occ-list" aria-label="Earlier ones">
+          {past.map((p) => {
+            const o = outcome(p)!;
+            return (
+              <li key={p.id}>
+                <span className={`dot dot-${o}`} aria-hidden="true" />
+                <button type="button" className="link" onClick={() => actions.setUi({ openItem: p.id })}>
+                  {fmt.day(occurrenceDay(p))}
+                </button>
+                <span className="hint">
+                  {WORD[o]}
+                  {o !== 'skipped' && p.closedOn && p.closedOn !== occurrenceDay(p) ? ` ${fmt.day(p.closedOn)}` : ''}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** A checklist. Ticks are in the history; a recurring item's next one starts unticked. */
+function Steps({ item }: { item: Item }) {
+  const { actions } = useApp();
+  const [text, setText] = useState('');
+  const steps = item.steps ?? [];
+  const done = steps.filter((x) => x.done).length;
+  const isOpen = item.status === 'open';
+  const add = () => {
+    if (!text.trim()) return;
+    actions.apply((d) => addStep(d, item.id, text, new Date()));
+    setText('');
+  };
+  return (
+    <section className="d-sec" aria-labelledby="d-steps" data-testid="drawer-steps">
+      <h3 className="d-h" id="d-steps">
+        Steps{steps.length ? ` · ${done} of ${steps.length} done` : ''}
+      </h3>
+      {steps.length > 0 && (
+        <>
+          <div className="progress mb-2" aria-hidden="true">
+            <span style={{ width: `${(done / steps.length) * 100}%` }} />
+          </div>
+          <ul className="steps">
+            {steps.map((st, i) => (
+              <li key={st.id} className={st.done ? 'is-done' : ''}>
+                <input type="checkbox" checked={st.done} disabled={!isOpen} onChange={() => actions.apply((d) => toggleStep(d, item.id, st.id, new Date()))} aria-label={`Done: ${st.text}`} data-testid={`step-${i}`} />
+                <CommitInput className="step-text" value={st.text} ariaLabel={`Step ${i + 1}`} onCommit={(v) => actions.apply((d) => renameStep(d, item.id, st.id, v, new Date()))} />
+                <span className="step-acts">
+                  {i > 0 && <IconButton icon="up" label={`Move "${st.text}" up`} onClick={() => actions.apply((d) => moveStep(d, item.id, st.id, -1, new Date()))} />}
+                  <IconButton icon="x" label={`Remove "${st.text}"`} onClick={() => actions.apply((d) => removeStep(d, item.id, st.id, new Date()), 'Step removed.')} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {isOpen && (
+        <input
+          className="input w-full"
+          value={text}
+          aria-label="Add a step"
+          placeholder={steps.length ? 'Another step, then Enter' : 'Break it into steps: type one, then Enter'}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+          data-testid="step-add"
+        />
+      )}
+      {item.recur && steps.length > 0 && <p className="hint mt-1">The next one starts with these, unticked.</p>}
+    </section>
+  );
 }

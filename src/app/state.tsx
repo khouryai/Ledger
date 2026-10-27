@@ -30,6 +30,9 @@ export type Toast = { id: number; text: string; kind: 'ok' | 'info' | 'error'; u
 
 type ChaseRequest = { itemIds: string[]; level?: ChaseLevel };
 
+/** A schedule being changed, an item being made to repeat, or an ended series started again. */
+export type ScheduleRequest = { kind: 'edit' | 'start'; itemId: string } | { kind: 'restart'; seriesId: string };
+
 type State = {
   status: Status;
   mode?: Mode;
@@ -50,7 +53,19 @@ type Ui = {
   openItem: string | null;
   chase: ChaseRequest | null;
   command: boolean;
+  schedule: ScheduleRequest | null;
+  /** The recurring item being paused. */
+  pause: string | null;
+  /** The form for a new recurring item is open. */
+  newRecurring: boolean;
 };
+
+const CLOSED: Ui = { openItem: null, chase: null, command: false, schedule: null, pause: null, newRecurring: false };
+
+/** True while a dialog is over the screen, so a list's single-key shortcuts stand down. */
+export function dialogOpen(ui: Ui): boolean {
+  return !!(ui.openItem || ui.chase || ui.command || ui.schedule || ui.pause || ui.newRecurring);
+}
 
 type Actions = {
   apply: (op: (doc: LedgerDoc) => LedgerDoc, toast?: string | (() => string)) => void;
@@ -114,7 +129,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     problems: [],
     outside: false,
   }));
-  const [ui, setUiState] = useState<Ui>({ openItem: null, chase: null, command: false });
+  const [ui, setUiState] = useState<Ui>(CLOSED);
   const storeRef = useRef<DocStore | null>(null);
   const idbRef = useRef<IndexedDbAdapter | null>(null);
   const handleRef = useRef<FileSystemDirectoryHandle | null>(null);
@@ -129,7 +144,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Going to another screen closes whatever was open over the last one.
   useEffect(() => {
-    const close = () => setUiState((u) => (u.openItem || u.command || u.chase ? { openItem: null, command: false, chase: null } : u));
+    const close = () => setUiState((u) => (dialogOpen(u) ? CLOSED : u));
     window.addEventListener('hashchange', close);
     return () => window.removeEventListener('hashchange', close);
   }, []);

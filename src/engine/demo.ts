@@ -3,10 +3,11 @@
  * fortnight's worth of the kind of items a commissioning manager carries. Built
  * relative to today so it always reads as current.
  */
-import { addWorkingDays, toDay, type Calendar } from './dates';
-import { emptyDoc } from './doc';
-import { addItem, addMeeting, addPerson, chase, complete, link, openSession, recordPromise } from './ops';
-import type { LedgerDoc } from './types';
+import { addDays, addMonths, addWorkingDays, toDay, type Calendar } from './dates';
+import { emptyDoc, newId } from './doc';
+import { addItem, addMeeting, addPerson, chase, complete, link, openSession, recordPromise, skip, type ItemDraft } from './ops';
+import { firstOccurrence, fullRule } from './recur';
+import type { Day, LedgerDoc, Recurrence } from './types';
 
 function at(day: string, hour = 10): Date {
   const [y, m, d] = day.split('-').map(Number);
@@ -57,7 +58,30 @@ export function demoDoc(now = new Date()): LedgerDoc {
   add('Comments on the possession plan', 'owe', { personId: people.maria, askedOn: wd(-3), due: wd(-1), tags: ['BART'] }, at(wd(-3)));
   const promised = add('Signed TAWR for Saturday', 'wait', { personId: people.maria, askedOn: wd(-4) }, at(wd(-4)));
   doc = recordPromise(doc, promised.id, wd(-1), 'Said she would sign it Monday', at(wd(-2)));
-  add('Timesheet', 'owe', { due: wd(1), recur: { every: 1, unit: 'week' } }, at(wd(-1)));
+  /**
+   * A recurring item with some weeks behind it: an occurrence from `start`, each one
+   * closed as `hows` says (on time, two working days late, or skipped), then the one
+   * in hand. Nothing is closed after today, and the one in hand is never left overdue,
+   * so the sample reads the same whatever day it is opened.
+   */
+  const routine = (draft: Omit<ItemDraft, 'recur'>, recur: Recurrence, start: Day, hows: ('done' | 'late' | 'skip')[]) => {
+    const rule = fullRule(recur, start);
+    const r = addItem(doc, { ...draft, recur: rule, due: firstOccurrence(rule, start, cal)! }, at(start, 8));
+    doc = r.doc;
+    let cur = r.item;
+    const close = (how: 'done' | 'late' | 'skip') => {
+      const when = how === 'late' ? addWorkingDays(cur.due!, 2, cal) : cur.due!;
+      if (when > today) return false;
+      const c = how === 'skip' ? skip(doc, cur.id, at(when, 8)) : complete(doc, cur.id, undefined, at(when, 8));
+      doc = c.doc;
+      if (c.spawned) cur = c.spawned;
+      return !!c.spawned;
+    };
+    for (const how of hows) if (!close(how)) break;
+    for (let i = 0; i < 20 && cur.due! < today && close('done'); i++);
+  };
+  const steps = (...texts: string[]) => texts.map((text) => ({ id: newId('st', now.getTime()), text, done: false }));
+  routine({ title: 'Timesheet', direction: 'owe', notes: 'Cost code 4410 for BART, 4420 for everything else.' }, { every: 1, unit: 'week', days: [5] }, addDays(today, -21), ['done', 'late', 'done']);
   add('Review IXL test procedure comments', 'owe', { personId: people.jordan, askedOn: wd(-2), due: wd(6), tags: ['IXL'] }, at(wd(-2)));
 
   const m = addMeeting(doc, { name: 'BART weekly progress', attendees: [people.priya, people.maria, people.sam], recurring: true }, now);
@@ -65,5 +89,21 @@ export function demoDoc(now = new Date()): LedgerDoc {
   const s = openSession(doc, m.meeting.id, wd(-5), at(wd(-5)));
   doc = s.doc;
   add('Confirm the possession dates for November', 'wait', { personId: people.maria, askedOn: wd(-5), source: { kind: 'meeting', ref: 'BART weekly progress', meetingId: m.meeting.id, sessionId: s.sessionId } }, at(wd(-5)));
+
+  routine({ title: 'Site diary', direction: 'owe' }, { every: 1, unit: 'day' }, wd(-5), ['done', 'done', 'done', 'skip', 'done']);
+  routine(
+    { title: 'Weekly progress report to BART', direction: 'owe', personId: people.priya, tags: ['BART'], steps: steps('Collect the test results', 'Update the look-ahead', 'Send to Priya') },
+    { every: 1, unit: 'week', days: [1] },
+    addDays(today, -21),
+    ['done', 'done', 'late'],
+  );
+  routine({ title: 'Radio test log', direction: 'wait', personId: people.dev, tags: ['Radio'] }, { every: 1, unit: 'week', days: [4] }, addDays(today, -21), ['done', 'late', 'done']);
+  routine(
+    { title: 'Monthly progress report', direction: 'owe', personId: people.maria, steps: steps("Pull the month's figures", 'Draft', 'Send to Maria') },
+    { every: 1, unit: 'month', monthDay: -1 },
+    addMonths(today, -2),
+    ['done', 'done'],
+  );
+  routine({ title: 'Two-week look-ahead', direction: 'owe', personId: people.jordan, tags: ['IXL'] }, { every: 2, unit: 'week', days: [3] }, addDays(today, -28), ['done', 'late']);
   return doc;
 }

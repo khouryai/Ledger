@@ -3,7 +3,8 @@
  */
 import { isDay } from './dates';
 import type { Example } from './learn';
-import { defaultSettings, DEFAULT_TEMPLATES, SCHEMA_VERSION, type Item, type LedgerDoc, type Meeting, type Person, type Settings } from './types';
+import { readRecurrence } from './recur';
+import { defaultSettings, DEFAULT_TEMPLATES, SCHEMA_VERSION, type Item, type LedgerDoc, type Meeting, type Person, type Settings, type Step } from './types';
 
 let counter = 0;
 
@@ -93,12 +94,47 @@ function readItem(raw: unknown, problems: string[]): Item | null {
     source: isObj(r.source) ? (r.source as Item['source']) : undefined,
     links: Array.isArray(r.links) ? r.links.filter((t): t is string => typeof t === 'string') : [],
     blockedBy: Array.isArray(r.blockedBy) ? r.blockedBy.filter((t): t is string => typeof t === 'string') : [],
-    recur: isObj(r.recur) ? (r.recur as Item['recur']) : undefined,
+    recur: readRecurrence(r.recur),
+    seriesId: str(r.seriesId),
+    steps: readSteps(r.steps),
     notes: str(r.notes),
     history: Array.isArray(r.history) ? r.history.filter((h) => isObj(h) && typeof h.at === 'string' && typeof h.kind === 'string') : [],
     createdAt: created,
     updatedAt: str(r.updatedAt) ?? created,
   };
+}
+
+function readSteps(raw: unknown): Step[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const steps = raw
+    .filter((s): s is Record<string, unknown> => isObj(s) && typeof s.id === 'string' && typeof s.text === 'string')
+    .map((s) => ({ id: s.id as string, text: s.text as string, done: s.done === true }));
+  return steps.length ? steps : undefined;
+}
+
+/**
+ * Before series were kept, each occurrence of a recurring item was linked to the one
+ * before only by the line its history starts with: "Recurs: next after #12". Those
+ * chains become series here, the same way on every device, so nothing has to be
+ * written for an old ledger to show its recurring items whole.
+ */
+function linkSeries(items: Item[]): void {
+  const byNum = new Map(items.map((i) => [i.num, i]));
+  const prevOf = new Map<Item, Item>();
+  for (const it of items) {
+    if (it.seriesId) continue;
+    const m = /^Recurs: next after #(\d+)$/.exec(it.history.find((h) => h.kind === 'created')?.text ?? '');
+    const prev = m ? byNum.get(Number(m[1])) : undefined;
+    // The one before was copied into this one: same direction and person, or it is not the one before.
+    if (prev && prev !== it && prev.direction === it.direction && prev.personId === it.personId) prevOf.set(it, prev);
+  }
+  const before = new Set(prevOf.values());
+  for (const it of items) {
+    if (it.seriesId || !(it.recur || prevOf.has(it) || before.has(it))) continue;
+    let root = it;
+    for (let i = 0; i < 1000 && !root.seriesId && prevOf.has(root); i++) root = prevOf.get(root)!;
+    it.seriesId = root.seriesId ?? root.id;
+  }
 }
 
 function isExample(v: unknown): v is Example {
@@ -133,6 +169,7 @@ export function readDoc(raw: unknown): { doc: LedgerDoc; problems: string[] } {
   // Number any item that arrived without one, in the order it was created.
   let next = Math.max(typeof raw.nextNum === 'number' ? raw.nextNum : 1, maxNum + 1);
   for (const it of [...items].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) if (!it.num) it.num = next++;
+  linkSeries(items);
   return {
     doc: {
       schema: SCHEMA_VERSION,

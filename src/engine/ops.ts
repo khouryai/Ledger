@@ -5,9 +5,10 @@
  * an edit that reached into it would make undo restore the edit. Each change that
  * matters later is also written into the item's history, which is append-only.
  */
-import { addDays, addMonths, addWorkingDays, onOrBeforeWorking, toDay, type Calendar } from './dates';
+import { addDays, fmtDay, isDay, toDay, type Calendar } from './dates';
 import { newId } from './doc';
-import type { Actor, ChaseLevel, Day, Direction, HistoryEvent, Item, LedgerDoc, Meeting, Person, Recurrence, Settings, Source } from './types';
+import { describeRecurrence, firstOccurrence, fullRule, nextOccurrence, occurrencesAfter, ruleOf, sameRecurrence } from './recur';
+import type { Actor, ChaseLevel, Day, Direction, HistoryEvent, Item, LedgerDoc, Meeting, Person, Recurrence, Settings, Source, Step } from './types';
 
 export type Op = (doc: LedgerDoc) => LedgerDoc;
 
@@ -45,6 +46,9 @@ export type ItemDraft = {
   links?: string[];
   blockedBy?: string[];
   recur?: Recurrence;
+  /** The series an occurrence belongs to. A new recurring item starts its own. */
+  seriesId?: string;
+  steps?: Step[];
   notes?: string;
   by?: Actor;
   /** A line for the history, e.g. which sentence an item was read from. */
@@ -55,8 +59,9 @@ export function addItem(doc: LedgerDoc, draft: ItemDraft, now: Date): { doc: Led
   const title = draft.title.trim();
   if (!title) throw new Error('An item needs a title.');
   const today = toDay(now);
+  const id = newId('it', now.getTime());
   const item: Item = {
-    id: newId('it', now.getTime()),
+    id,
     num: doc.nextNum,
     title,
     direction: draft.direction,
@@ -69,6 +74,8 @@ export function addItem(doc: LedgerDoc, draft: ItemDraft, now: Date): { doc: Led
     links: draft.links ?? [],
     blockedBy: draft.blockedBy ?? [],
     recur: draft.recur,
+    seriesId: draft.seriesId ?? (draft.recur ? id : undefined),
+    steps: draft.steps?.length ? draft.steps : undefined,
     notes: draft.notes,
     history: [ev(now, 'created', draft.createdNote, draft.by ?? 'you', draft.due ? { due: draft.due } : {})],
     createdAt: stamp(now),
@@ -86,12 +93,21 @@ const FIELD_LABEL: Partial<Record<keyof ItemPatch, string>> = {
   askedOn: 'Asked on',
   due: 'Due',
   nextChase: 'Next chase',
+  recur: 'Repeats',
 };
+
+/** A change of schedule in words: "Repeats: Every Friday → Every Thursday". */
+function recurLine(from: Recurrence | undefined, to: Recurrence | undefined, settings: Settings): string {
+  const say = (r: Recurrence) => describeRecurrence(r, { order: settings.dateOrder });
+  if (!to) return `Stopped repeating (was ${from ? say(from) : 'repeating'})`;
+  return from ? `Repeats: ${say(from)} → ${say(to)}` : `Repeats ${say(to)}`;
+}
 
 /**
  * Change fields on an item. Changes worth knowing about later (a moved date, a
- * different person) are written to the history in words; notes and tags are not,
- * because the history is for what happened to the request, not to its wording.
+ * different person, a new schedule) are written to the history in words; notes and
+ * tags are not, because the history is for what happened to the request, not to its
+ * wording.
  */
 export function updateItem(doc: LedgerDoc, id: string, patch: ItemPatch, now: Date, describe?: (field: keyof ItemPatch, from: unknown, to: unknown) => string): LedgerDoc {
   return replaceItem(doc, id, (it) => {
@@ -102,9 +118,16 @@ export function updateItem(doc: LedgerDoc, id: string, patch: ItemPatch, now: Da
       if (!label) continue;
       const from = it[key];
       const to = next[key];
+      if (key === 'recur') {
+        if (!sameRecurrence(it.recur, next.recur)) lines.push(recurLine(it.recur, next.recur, doc.settings));
+        continue;
+      }
       if (from === to) continue;
-      lines.push(describe ? describe(key, from, to) : `${label}: ${from ?? 'none'} → ${to ?? 'none'}`);
+      const word = (v: unknown) => (v === undefined ? 'none' : isDay(v) ? fmtDay(v, doc.settings.dateOrder) : String(v));
+      lines.push(describe ? describe(key, from, to) : `${label}: ${word(from)} → ${word(to)}`);
     }
+    // An item that starts repeating starts a series of its own.
+    if (next.recur && !next.seriesId) next.seriesId = it.id;
     if (patch.direction && patch.direction !== it.direction && patch.direction === 'owe') next.nextChase = undefined;
     const dueSet = 'due' in patch && patch.due !== it.due && patch.due ? { due: patch.due } : {};
     return lines.length ? { ...next, history: [...it.history, ev(now, 'edited', lines.join('; '), 'you', dueSet)] } : next;
@@ -131,23 +154,58 @@ export function levelWord(level: ChaseLevel): string {
   return level === 'nudge' ? 'Nudge' : level === 'firm' ? 'Firm chase' : 'Escalation';
 }
 
-/** Next due date for a recurring item, on or before the matching working day. */
-export function nextRecurrence(from: Day, recur: Recurrence, cal: Calendar): Day {
-  if (recur.unit === 'day') return addWorkingDays(from, Math.max(1, recur.every), cal);
-  if (recur.unit === 'week') return onOrBeforeWorking(addDays(from, 7 * Math.max(1, recur.every)), cal);
-  return onOrBeforeWorking(addMonths(from, Math.max(1, recur.every)), cal);
+/**
+ * Put the next occurrence of a recurring item on the list: the first day of its
+ * schedule after the one just closed, and not before today unless each one is owed
+ * (or not before `resumeOn`, after a pause). It is the one before, copied: what, who,
+ * tags, links, notes and steps (unticked), with the schedule held whole. The dates
+ * passed over on the way are named in its history, so a skipped week is never silent.
+ */
+function spawnNext(doc: LedgerDoc, it: Item, now: Date, resumeOn?: Day): { doc: LedgerDoc; spawned?: Item } {
+  const rule = ruleOf(it);
+  if (!rule) return { doc };
+  // An occurrence reopened after the next one went on the list has a next already.
+  const series = it.seriesId ?? it.id;
+  if (doc.items.some((x) => x.id !== it.id && x.status === 'open' && x.recur && (x.seriesId ?? x.id) === series)) return { doc };
+  const today = toDay(now);
+  const cal = calendarOf(doc.settings);
+  const after = it.due ?? today;
+  const notBefore = resumeOn && resumeOn > today ? resumeOn : rule.catchUp ? undefined : today;
+  const due = nextOccurrence(rule, after, cal, notBefore);
+  if (!due) return { doc };
+  const passed = notBefore ? occurrencesAfter(rule, after, addDays(due, -1), cal) : [];
+  const words = (d: Day) => fmtDay(d, doc.settings.dateOrder, today);
+  const made = addItem(
+    doc,
+    {
+      title: it.title,
+      direction: it.direction,
+      personId: it.personId,
+      tags: it.tags,
+      due,
+      recur: rule,
+      seriesId: it.seriesId ?? it.id,
+      source: it.source,
+      links: it.links,
+      notes: it.notes,
+      steps: it.steps?.map((s) => ({ ...s, done: false })),
+      createdNote: `Recurs: next after #${it.num}${passed.length ? `. Passed over: ${passed.length > 3 ? `${passed.length} dates from ${words(passed[0])}` : passed.map(words).join(', ')}` : ''}`,
+    },
+    now,
+  );
+  return { doc: made.doc, spawned: made.item };
 }
 
 /**
- * Close an item as done. For a waiting item that is "received". A recurring item
- * spawns its next occurrence, linked by a line in both histories.
+ * Close an item as done. For a waiting item that is "received". A recurring item puts
+ * its next occurrence on the list, linked by its series and a line in its history.
  */
 export function complete(doc: LedgerDoc, id: string, note: string | undefined, now: Date): { doc: LedgerDoc; spawned?: Item } {
   const today = toDay(now);
   const it = doc.items.find((i) => i.id === id);
   if (!it) throw new Error(`No item ${id}`);
   const kind = it.direction === 'wait' ? 'received' : 'done';
-  let out = replaceItem(doc, id, (x) => ({
+  const out = replaceItem(doc, id, (x) => ({
     ...x,
     status: 'done',
     closedOn: today,
@@ -157,29 +215,61 @@ export function complete(doc: LedgerDoc, id: string, note: string | undefined, n
     updatedAt: stamp(now),
     history: [...x.history, ev(now, kind, note?.trim() || undefined)],
   }));
-  let spawned: Item | undefined;
-  if (it.recur) {
-    const cal = calendarOf(doc.settings);
-    const due = nextRecurrence(it.due && it.due > today ? it.due : (it.due ?? today), it.recur, cal);
-    const made = addItem(
-      out,
-      {
-        title: it.title,
-        direction: it.direction,
-        personId: it.personId,
-        tags: it.tags,
-        due: due > today ? due : nextRecurrence(today, it.recur, cal),
-        recur: it.recur,
-        source: it.source,
-        links: it.links,
-        createdNote: `Recurs: next after #${it.num}`,
-      },
-      now,
-    );
-    out = made.doc;
-    spawned = made.item;
-  }
-  return { doc: out, spawned };
+  return it.recur && it.status === 'open' ? spawnNext(out, it, now) : { doc: out };
+}
+
+/**
+ * Pass over one occurrence of a recurring item: it is closed as skipped, which is
+ * neither done nor late, and the next one goes on the list. With `resumeOn`, every
+ * occurrence before that day is passed over too: a pause.
+ */
+export function skip(doc: LedgerDoc, id: string, now: Date, resumeOn?: Day): { doc: LedgerDoc; spawned?: Item } {
+  const it = doc.items.find((i) => i.id === id);
+  if (!it) throw new Error(`No item ${id}`);
+  if (!it.recur || it.status !== 'open') throw new Error('Only a recurring item still on the list can be skipped.');
+  const today = toDay(now);
+  const why = resumeOn && resumeOn > today ? `Paused until ${fmtDay(resumeOn, doc.settings.dateOrder, today)}` : undefined;
+  const out = replaceItem(doc, id, (x) => ({
+    ...x,
+    status: 'dropped',
+    closedOn: today,
+    closeNote: why ?? 'Skipped',
+    snoozeUntil: undefined,
+    nextChase: undefined,
+    updatedAt: stamp(now),
+    history: [...x.history, ev(now, 'skipped', why)],
+  }));
+  return spawnNext(out, it, now, resumeOn);
+}
+
+/**
+ * Start a series again whose last occurrence has been closed: a new occurrence on the
+ * first day of `recur` from `start`, in the same series.
+ */
+export function restartSeries(doc: LedgerDoc, lastId: string, recur: Recurrence, start: Day, now: Date): { doc: LedgerDoc; item: Item } {
+  const last = doc.items.find((i) => i.id === lastId);
+  if (!last) throw new Error(`No item ${lastId}`);
+  const rule = fullRule({ ...recur, from: undefined }, start);
+  const due = firstOccurrence(rule, start, calendarOf(doc.settings));
+  if (!due) throw new Error('That schedule has no dates left. Change when it ends.');
+  return addItem(
+    doc,
+    {
+      title: last.title,
+      direction: last.direction,
+      personId: last.personId,
+      tags: last.tags,
+      due,
+      recur: rule,
+      seriesId: last.seriesId ?? last.id,
+      source: last.source,
+      links: last.links,
+      notes: last.notes,
+      steps: last.steps?.map((s) => ({ ...s, done: false })),
+      createdNote: `Started again after #${last.num}`,
+    },
+    now,
+  );
 }
 
 export function drop(doc: LedgerDoc, id: string, reason: string | undefined, now: Date): LedgerDoc {
@@ -219,6 +309,51 @@ export function addNote(doc: LedgerDoc, id: string, text: string, now: Date, by:
   const t = text.trim();
   if (!t) return doc;
   return replaceItem(doc, id, (it) => ({ ...it, updatedAt: stamp(now), history: [...it.history, ev(now, 'note', t, by)] }));
+}
+
+// ── Steps ───────────────────────────────────────────────────────────────────
+
+function withSteps(it: Item, steps: Step[], now: Date, event?: HistoryEvent): Item {
+  return { ...it, steps: steps.length ? steps : undefined, updatedAt: stamp(now), ...(event ? { history: [...it.history, event] } : {}) };
+}
+
+/** Add a step to an item's checklist. Writing the list is wording, not history. */
+export function addStep(doc: LedgerDoc, id: string, text: string, now: Date): LedgerDoc {
+  const t = text.trim();
+  if (!t) return doc;
+  return replaceItem(doc, id, (it) => withSteps(it, [...(it.steps ?? []), { id: newId('st', now.getTime()), text: t, done: false }], now));
+}
+
+/** Tick a step, or untick it. That is progress on the item, so it is in the history. */
+export function toggleStep(doc: LedgerDoc, id: string, stepId: string, now: Date): LedgerDoc {
+  return replaceItem(doc, id, (it) => {
+    const step = it.steps?.find((s) => s.id === stepId);
+    if (!step) return it;
+    const done = !step.done;
+    return withSteps(it, it.steps!.map((s) => (s.id === stepId ? { ...s, done } : s)), now, ev(now, 'step', `${done ? 'Done' : 'Not done after all'}: ${step.text}`));
+  });
+}
+
+export function renameStep(doc: LedgerDoc, id: string, stepId: string, text: string, now: Date): LedgerDoc {
+  const t = text.trim();
+  if (!t) return removeStep(doc, id, stepId, now);
+  return replaceItem(doc, id, (it) => withSteps(it, (it.steps ?? []).map((s) => (s.id === stepId ? { ...s, text: t } : s)), now));
+}
+
+export function removeStep(doc: LedgerDoc, id: string, stepId: string, now: Date): LedgerDoc {
+  return replaceItem(doc, id, (it) => withSteps(it, (it.steps ?? []).filter((s) => s.id !== stepId), now));
+}
+
+/** Move a step up (-1) or down (1) the list. */
+export function moveStep(doc: LedgerDoc, id: string, stepId: string, by: -1 | 1, now: Date): LedgerDoc {
+  return replaceItem(doc, id, (it) => {
+    const steps = [...(it.steps ?? [])];
+    const i = steps.findIndex((s) => s.id === stepId);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= steps.length) return it;
+    [steps[i], steps[j]] = [steps[j], steps[i]];
+    return withSteps(it, steps, now);
+  });
 }
 
 /** Kept in the weekly review: it has been looked at, which resets the review clock only. */

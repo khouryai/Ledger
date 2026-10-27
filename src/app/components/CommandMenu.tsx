@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { matches } from '../../engine/review';
+import { weekOf } from '../../engine/week';
 import { navigate } from '../router';
 import { useApp } from '../state';
 import { focusQuickAdd } from './QuickAdd';
@@ -26,12 +27,16 @@ export function CommandMenu() {
     const base: Entry[] = [
       { group: 'Do', label: 'Add an item', hint: 'Ctrl N', run: () => (close(), setTimeout(focusQuickAdd)) },
       { group: 'Do', label: 'Undo the last change', hint: 'Ctrl Z', run: () => (actions.undo(), close()) },
+      { group: 'Do', label: 'Add a recurring item', run: () => (close(), actions.setUi({ newRecurring: true })) },
       { group: 'Do', label: 'Capture from an email or notes', run: go('capture') },
       { group: 'Do', label: 'Start the weekly review', run: go('review') },
+      { group: 'Do', label: 'Plan next week', run: go('week', { w: weekOf(state.today, 1) }) },
       { group: 'Do', label: 'Export the action log to Excel', run: go('all', { export: '1' }) },
-      { group: 'Go to', label: 'Today', run: go('today') },
-      { group: 'Go to', label: 'I owe', run: go('owe') },
-      { group: 'Go to', label: 'Waiting on', run: go('wait') },
+      { group: 'Go to', label: 'Today', hint: '1', run: go('today') },
+      { group: 'Go to', label: 'This week', hint: '2', run: go('week') },
+      { group: 'Go to', label: 'I owe', hint: '3', run: go('owe') },
+      { group: 'Go to', label: 'Waiting on', hint: '4', run: go('wait') },
+      { group: 'Go to', label: 'Recurring', hint: '5', run: go('recurring') },
       { group: 'Go to', label: 'Meetings', run: go('meetings') },
       { group: 'Go to', label: 'People', run: go('people') },
       { group: 'Go to', label: 'Everything (search)', run: go('all') },
@@ -54,7 +59,7 @@ export function CommandMenu() {
       : [];
     const filtered = query ? base.filter((e) => e.label.toLowerCase().includes(query.toLowerCase())) : base;
     return [...items, ...people, ...filtered];
-  }, [q, doc]);
+  }, [q, doc, state.today]);
 
   useEffect(() => setI(0), [q]);
 

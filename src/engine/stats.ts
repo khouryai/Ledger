@@ -14,7 +14,7 @@ export function eventDay(e: HistoryEvent): Day {
 }
 
 /** Events that count as somebody having touched the item. */
-const TOUCH = new Set<HistoryEvent['kind']>(['created', 'edited', 'chased', 'promise', 'note', 'reviewed', 'reopened', 'snoozed', 'linked']);
+const TOUCH = new Set<HistoryEvent['kind']>(['created', 'edited', 'chased', 'promise', 'note', 'reviewed', 'reopened', 'snoozed', 'linked', 'step']);
 
 /** Events that count as movement on the request itself, not just me poking it. */
 const MOVEMENT = new Set<HistoryEvent['kind']>(['created', 'promise', 'note', 'reopened', 'edited']);
@@ -77,7 +77,7 @@ export function median(xs: number[]): number | null {
 }
 
 export type PersonStats = {
-  /** Closed waiting items with this person that the figures are counted from. */
+  /** Closed waiting items with this person that the delivery figures are counted from. */
   samples: number;
   /** True once there are enough samples to use instead of the defaults. */
   learned: boolean;
@@ -90,6 +90,8 @@ export type PersonStats = {
   promised: number;
   /** Median chases it took before it arrived. */
   chasesNeeded: number | null;
+  /** Recurring deliveries received from them: counted as promises, not for how long they take. */
+  recurring: number;
   openWait: number;
   openOwe: number;
 };
@@ -102,7 +104,10 @@ export function personStats(items: Item[], personId: string, settings: Settings,
   const chaseCounts: number[] = [];
   let kept = 0;
   for (const it of received) {
-    delivery.push(Math.max(0, workingDaysBetween(it.askedOn, it.closedOn!, cal)));
+    // A recurring delivery falls due on its schedule, not some days after it was
+    // asked for, so how long it took says nothing about how long this person takes.
+    // Its date still counts as a promise kept or missed.
+    if (!it.recur && !it.seriesId) delivery.push(Math.max(0, workingDaysBetween(it.askedOn, it.closedOn!, cal)));
     chaseCounts.push(chases(it).length);
     const promise = promiseAtClose(it);
     if (promise) {
@@ -112,13 +117,14 @@ export function personStats(items: Item[], personId: string, settings: Settings,
     }
   }
   return {
-    samples: received.length,
-    learned: received.length >= settings.learnAfter,
+    samples: delivery.length,
+    learned: delivery.length >= settings.learnAfter,
     deliveryDays: median(delivery),
     lateDays: median(late),
     promisesKept: late.length ? kept / late.length : null,
     promised: late.length,
     chasesNeeded: median(chaseCounts),
+    recurring: received.length - delivery.length,
     openWait: mine.filter((i) => i.status === 'open' && i.direction === 'wait').length,
     openOwe: mine.filter((i) => i.status === 'open' && i.direction === 'owe').length,
   };

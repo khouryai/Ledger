@@ -29,6 +29,10 @@ npm run test:ui     # both builds in Chromium; any console error fails a test
 - `src/ai/` is the on-device model. `tasks.ts` builds every prompt and checks every
   answer; nothing in `src/app/` talks to the engine directly. `download.ts` explains a
   failed download; `modelFolder.ts` copies a downloaded model to a folder and back.
+- `src/engine/recur.ts` is a schedule: the next date, the schedule in words, and the
+  add line's grammar for it. `series.ts` groups a recurring item's occurrences and counts
+  their record; `week.ts` lays out a week. Only the occurrence in hand is an item; the
+  ones after it are worked out, never stored.
 - `src/engine/learn.ts` is the model that learns from the user's decisions (docs/AI.md).
   Examples are stored in the ledger (`doc.examples`); the model is rebuilt from them,
   never stored. `src/app/learning.ts` applies it to suggestions.
@@ -63,6 +67,10 @@ npm run test:ui     # both builds in Chromium; any console error fails a test
   facts the decision used.
 - **A name is matched exactly or not at all** (`engine/people.ts`): an unknown name is
   offered as a new person, two matches are asked about, nothing picks the likeliest.
+- **A recurring item keeps to its own days.** Closing (or skipping) the one in hand puts
+  the next on the list: the schedule's next day after the one closed, not before today
+  unless each one is owed. The dates passed over are named in its history. A date on a
+  day off is due the working day before, and the next goes back to the schedule.
 - **The model's answers are checked, never trusted**: dates re-derived from its words
   with our parser, people matched exactly, quotes looked for in the text.
 - **Nothing is sent from the app.** Chasers leave as a mailto link or an unsent .eml.

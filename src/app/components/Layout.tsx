@@ -1,16 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { today as todayList, todayCount } from '../../engine/decide';
 import { reviewDue, reviewQueue } from '../../engine/review';
+import { allSeries } from '../../engine/series';
 import { buildLabel, BUILD_COMMIT, BUILD_TIME } from '../build';
 import { fmtDateTime } from '../format';
 import { href } from '../router';
-import { useApp } from '../state';
+import { dialogOpen, useApp } from '../state';
 import { applyUpdate, useUpdateReady } from '../update';
 import { ChaseDialog } from './ChaseDialog';
 import { CommandMenu } from './CommandMenu';
 import { Icon, LogoMark, type IconName } from './icons';
 import { ItemDrawer } from './ItemDrawer';
 import { focusQuickAdd, QuickAdd } from './QuickAdd';
+import { ScheduleDialogs } from './Schedule';
 import { Kbd, Modal } from './ui';
 
 /** `hot` draws the count in red; `flag` is a word shown when there is no count. */
@@ -23,13 +25,18 @@ export function Layout({ screen, children }: { screen: string; children: React.R
   const t = todayList(ctx);
   const open = doc.items.filter((i) => i.status === 'open');
   const queue = reviewQueue(ctx);
+  // Recurring items due today or late are the ones to flag; the rest is a plain count.
+  const repeating = allSeries(doc).filter((s) => s.active);
+  const routinesDue = repeating.filter((s) => s.current?.due && s.current.due <= state.today).length;
   const nav: { section: string; items: NavItem[] }[] = [
     {
       section: 'Work',
       items: [
         { id: 'today', label: 'Today', icon: 'today', count: todayCount(t), hot: todayCount(t) > 0 },
+        { id: 'week', label: 'Week', icon: 'week' },
         { id: 'owe', label: 'I owe', icon: 'owe', count: open.filter((i) => i.direction === 'owe').length },
         { id: 'wait', label: 'Waiting on', icon: 'wait', count: open.filter((i) => i.direction === 'wait').length },
+        { id: 'recurring', label: 'Recurring', icon: 'repeat', count: routinesDue || repeating.length || undefined, hot: routinesDue > 0 },
         { id: 'capture', label: 'Capture', icon: 'inbox' },
         { id: 'meetings', label: 'Meetings', icon: 'calendar' },
       ],
@@ -61,8 +68,9 @@ export function Layout({ screen, children }: { screen: string; children: React.R
     if (document.activeElement?.closest('.sidenav')) main.focus({ preventScroll: true });
   }, [screen]);
 
-  // Shortcuts that work everywhere: Ctrl+K, Ctrl+N or n, Ctrl+Z, ?.
-  useEffect(() => {
+  // Shortcuts that work everywhere: Ctrl+K, Ctrl+N or n, Ctrl+Z, ?, and 1 to 5. Attached
+  // as the screen is drawn, so a key pressed the moment it appears is not lost.
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       const typing = !!t.closest('input, textarea, select, [contenteditable="true"]');
@@ -70,7 +78,7 @@ export function Layout({ screen, children }: { screen: string; children: React.R
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         actions.setUi({ command: !ui.command });
-      } else if ((mod && e.key.toLowerCase() === 'n') || (!typing && !mod && e.key === 'n' && !ui.openItem && !ui.chase)) {
+      } else if ((mod && e.key.toLowerCase() === 'n') || (!typing && !mod && e.key === 'n' && !dialogOpen(ui))) {
         e.preventDefault();
         actions.setUi({ openItem: null, command: false });
         focusQuickAdd();
@@ -80,11 +88,14 @@ export function Layout({ screen, children }: { screen: string; children: React.R
       } else if (!typing && !mod && e.key === '?') {
         e.preventDefault();
         setHelp((h) => !h);
+      } else if (!typing && !mod && !e.altKey && !dialogOpen(ui) && GO[e.key]) {
+        e.preventDefault();
+        window.location.hash = href(GO[e.key]);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [actions, ui.command, ui.openItem, ui.chase]);
+  }, [actions, ui]);
 
   const where = state.mode === 'folder' || state.mode === 'cloud' ? state.where : state.mode === 'browser' ? 'This browser' : 'Not saving';
   const saved = state.saving
@@ -98,6 +109,7 @@ export function Layout({ screen, children }: { screen: string; children: React.R
         : state.lastSavedAt
           ? `Saved ${fmtSaved(state.lastSavedAt)}`
           : 'Saved';
+  // On a phone: Today, the week and the two lists; the rest is under More.
   const tabs: NavItem[] = [nav[0].items[0], nav[0].items[1], nav[0].items[2], nav[0].items[3]];
 
   return (
@@ -252,6 +264,7 @@ export function Layout({ screen, children }: { screen: string; children: React.R
       </main>
       <ItemDrawer />
       <ChaseDialog />
+      <ScheduleDialogs />
       {ui.command && <CommandMenu />}
       {help && <ShortcutsDialog onClose={() => setHelp(false)} />}
     </div>
@@ -266,9 +279,14 @@ function fmtSaved(iso: string): string {
   return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
+/** Number keys go straight to the screens used most, in the order of the menu. */
+const GO: Record<string, string> = { '1': 'today', '2': 'week', '3': 'owe', '4': 'wait', '5': 'recurring' };
+
 const SHORTCUTS: { keys: string[][]; what: string }[] = [
   { keys: [['Ctrl', 'K']], what: 'Commands, and search for any item or person' },
   { keys: [['Ctrl', 'N'], ['N']], what: 'Add something in the line at the top' },
+  { keys: [['1'], ['2'], ['3'], ['4'], ['5']], what: 'Today, Week, I owe, Waiting on, Recurring' },
+  { keys: [['←'], ['→']], what: 'On Week: the week before, the week after' },
   { keys: [['Tab']], what: 'In the add line: switch between I owe and Waiting on' },
   { keys: [['J'], ['↓']], what: 'Next item in a list' },
   { keys: [['K'], ['↑']], what: 'Previous item' },

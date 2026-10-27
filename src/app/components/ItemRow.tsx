@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { addWorkingDays } from '../../engine/dates';
+import { addDays, addWorkingDays, endOfWeek, mondayOf, onOrAfterWorking } from '../../engine/dates';
 import { age, chasePlan, isSnoozed, risk } from '../../engine/decide';
-import { calendarOf, complete, snooze } from '../../engine/ops';
+import { calendarOf, complete, skip, snooze, updateItem } from '../../engine/ops';
+import { ruleOf } from '../../engine/recur';
 import type { Day, Item } from '../../engine/types';
 import { makeFmt } from '../format';
 import { href } from '../router';
-import { useApp } from '../state';
+import { dialogOpen, useApp } from '../state';
 import { Icon } from './icons';
+import { RecurLabel } from './Schedule';
 import { Avatar, Badge, IconButton, MenuButton } from './ui';
 
 /** Snooze choices, as days from today. */
@@ -25,19 +27,60 @@ export function snoozeChoices(today: Day, cal: ReturnType<typeof calendarOf>): {
   ];
 }
 
+/** Days to move a deadline to, from today: the end of this week, the start of the next. */
+export function moveChoices(today: Day, cal: ReturnType<typeof calendarOf>): { label: string; day: Day }[] {
+  const tomorrow = addWorkingDays(today, 1, cal);
+  const friday = endOfWeek(today, cal);
+  const nextWeek = onOrAfterWorking(mondayOf(addDays(today, 7)), cal);
+  return [
+    { label: 'Today', day: today },
+    { label: 'Tomorrow', day: tomorrow },
+    ...(friday > tomorrow ? [{ label: 'End of this week', day: friday }] : []),
+    { label: 'Start of next week', day: nextWeek },
+    { label: 'End of next week', day: endOfWeek(addDays(today, 7), cal) },
+  ];
+}
+
 export function useItemActions() {
   const { state, actions } = useApp();
   const cal = calendarOf(state.doc.settings);
+  const fmt = makeFmt(state.doc.settings.dateOrder, state.today, cal);
   return {
-    close: (it: Item, note?: string) =>
+    close: (it: Item, note?: string) => {
+      let next: Item | undefined;
       actions.apply(
-        (d) => complete(d, it.id, note, new Date()).doc,
-        () => `${it.direction === 'wait' ? 'Received' : 'Done'}: #${it.num}${it.recur ? '. The next one is on the list.' : ''}`,
-      ),
+        (d) => {
+          const r = complete(d, it.id, note, new Date());
+          next = r.spawned;
+          return r.doc;
+        },
+        () =>
+          `${it.direction === 'wait' ? 'Received' : 'Done'}: #${it.num}${next ? `. The next is due ${fmt.day(next.due)}.` : it.recur && ruleOf(it)?.until ? '. That was the last one.' : ''}`,
+      );
+    },
+    /** Pass over this occurrence of a recurring item; the next goes on the list. */
+    skip: (it: Item) => {
+      let next: Item | undefined;
+      actions.apply(
+        (d) => {
+          const r = skip(d, it.id, new Date());
+          next = r.spawned;
+          return r.doc;
+        },
+        () => `Skipped #${it.num}${next ? `. The next is due ${fmt.day(next.due)}.` : '. That was the last one.'}`,
+      );
+    },
+    /** A new deadline for something I owe, or none. */
+    move: (it: Item, day: Day | undefined) => actions.apply((d) => updateItem(d, it.id, { due: day }, new Date()), day ? `#${it.num} is due ${fmt.day(day)}.` : `#${it.num} has no date now.`),
+    /** Chase a waiting item on a day of my choosing. */
+    chaseOn: (it: Item, day: Day) => actions.apply((d) => updateItem(d, it.id, { nextChase: day }, new Date()), `Chase #${it.num} on ${fmt.day(day)}.`),
     snooze: (it: Item, day: Day | undefined) => actions.apply((d) => snooze(d, it.id, day, new Date()), day ? `Snoozed #${it.num}` : `Woke #${it.num}`),
     chase: (ids: string[]) => actions.setUi({ chase: { itemIds: ids } }),
     open: (it: Item) => actions.setUi({ openItem: it.id }),
+    pause: (it: Item) => actions.setUi({ pause: it.id }),
+    schedule: (it: Item) => actions.setUi({ schedule: { kind: it.recur ? 'edit' : 'start', itemId: it.id } }),
     snoozeChoices: () => snoozeChoices(state.today, cal),
+    moveChoices: () => moveChoices(state.today, cal),
   };
 }
 
@@ -59,6 +102,8 @@ export function ItemRow({ item, reason, selected, onSelect, hidePerson }: { item
   const snoozed = isSnoozed(item, state.today);
   const chaseDue = !!plan && item.status === 'open' && !snoozed && plan.day <= state.today;
   const dirWord = item.direction === 'owe' ? 'I owe' : 'Waiting on';
+  const rule = ruleOf(item);
+  const stepsDone = item.steps?.filter((x) => x.done).length ?? 0;
 
   return (
     <div className={`row${selected ? ' is-sel' : ''}${item.status !== 'open' ? ' is-closed' : ''}`} data-item={item.num} data-tone={ag.tone}>
@@ -111,9 +156,10 @@ export function ItemRow({ item, reason, selected, onSelect, hidePerson }: { item
               {rk.level === 'risk' ? 'At risk' : 'Input has no date'}
             </Badge>
           )}
-          {item.recur && (
-            <span className="inline-flex items-center gap-1" title="Repeats">
-              <Icon name="repeat" size={12} /> {item.recur.unit === 'day' ? 'daily' : item.recur.unit === 'week' ? (item.recur.every === 2 ? 'fortnightly' : 'weekly') : 'monthly'}
+          {rule && <RecurLabel recur={rule} />}
+          {item.steps && (
+            <span className={`inline-flex items-center gap-1${stepsDone === item.steps.length ? ' tone-good' : ''}`} title={`${stepsDone} of ${item.steps.length} steps done`}>
+              <Icon name="steps" size={12} /> {stepsDone}/{item.steps.length}
             </span>
           )}
           {item.tags.map((t) => (
@@ -129,11 +175,26 @@ export function ItemRow({ item, reason, selected, onSelect, hidePerson }: { item
         <div className="row-acts">
           {item.direction === 'wait' && <IconButton icon="mail" label={`Chase #${item.num}`} onClick={() => a.chase([item.id])} testid={`chase-${item.num}`} />}
           <IconButton icon="check" label={`${item.direction === 'wait' ? 'Received' : 'Done'}: #${item.num}`} onClick={() => a.close(item)} testid={`done-${item.num}`} />
+          {item.direction === 'owe' && (
+            <MenuButton
+              label={`Move #${item.num}`}
+              icon="move"
+              testid={`move-${item.num}`}
+              items={[
+                ...a.moveChoices().filter((c) => c.day !== item.due).map((c) => ({ label: `${c.label} (${fmt.day(c.day)})`, onClick: () => a.move(item, c.day) })),
+                ...(item.due && !item.recur ? [{ label: 'No date', onClick: () => a.move(item, undefined) }] : []),
+              ]}
+            />
+          )}
           <MenuButton
-            label={`Snooze #${item.num}`}
+            label={rule ? `Snooze or skip #${item.num}` : `Snooze #${item.num}`}
             icon="moon"
             testid={`snooze-${item.num}`}
-            items={[...a.snoozeChoices().map((c) => ({ label: `${c.label} (${fmt.day(c.day)})`, onClick: () => a.snooze(item, c.day) })), ...(snoozed ? [{ label: 'Wake now', onClick: () => a.snooze(item, undefined) }] : [])]}
+            items={[
+              ...a.snoozeChoices().map((c) => ({ label: `${c.label} (${fmt.day(c.day)})`, onClick: () => a.snooze(item, c.day) })),
+              ...(snoozed ? [{ label: 'Wake now', onClick: () => a.snooze(item, undefined) }] : []),
+              ...(rule ? [{ label: 'Skip this one', onClick: () => a.skip(item) }, { label: 'Pause until…', onClick: () => a.pause(item) }] : []),
+            ]}
           />
         </div>
       ) : (
@@ -151,7 +212,7 @@ export function useListKeys(items: Item[], enabled = true) {
   useEffect(() => {
     if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
-      if (ui.openItem || ui.chase || ui.command || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (dialogOpen(ui) || e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, select, [contenteditable="true"], [role="menu"]')) return;
       // A focused row's own button opens it on Enter; do not open it twice.
@@ -178,6 +239,6 @@ export function useListKeys(items: Item[], enabled = true) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [items, sel, enabled, ui.openItem, ui.chase, ui.command, a]);
+  }, [items, sel, enabled, ui, a]);
   return { sel, setSel };
 }

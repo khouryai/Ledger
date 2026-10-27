@@ -53,4 +53,13 @@ describe('meetings and filters', () => {
     expect(filterItems(ctx, { query: 'sam bart' }).map((i) => i.title)).toEqual(['ATS report']);
     expect(filterItems(ctx, { query: '#2' }).map((i) => i.title)).toEqual(['IXL plan']);
   });
+  it('reads #12 as item 12 alone', () => {
+    let doc = docWith();
+    for (let i = 1; i <= 12; i++) doc = add(doc, { title: `Item ${i}`, notes: i === 3 ? 'see #1 and 10/14' : undefined }).doc;
+    const ctx = makeCtx(doc, TODAY);
+    expect(filterItems(ctx, { query: '#1' }).map((i) => i.num)).toEqual([1]);
+    expect(filterItems(ctx, { query: ' #12 ' }).map((i) => i.num)).toEqual([12]);
+    // Without the #, a number is a word like any other.
+    expect(filterItems(ctx, { query: '1' }).map((i) => i.num)).toEqual([1, 3, 10, 11, 12]);
+  });
 });

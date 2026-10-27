@@ -40,6 +40,16 @@ const PATHS: Record<string, string> = {
   eyeOff: 'M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2',
   logout: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11',
   cloud: 'M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8z',
+  week: 'M4 5h16v14H4zM4 9h16M9.3 9v10M14.7 9v10',
+  skip: 'M5 6l6 6-6 6M12 6l6 6-6 6M20 5v14',
+  pause: 'M9 5v14M15 5v14',
+  steps: 'M10 6h10M10 12h10M10 18h10M3.5 6l1.5 1.5 2.5-2.5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5',
+  move: 'M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M9 14.5h6M12.5 12l2.5 2.5-2.5 2.5',
+  chevronLeft: 'M15 6l-6 6 6 6',
+  up: 'M6 15l6-6 6 6',
+  down: 'M6 9l6 6 6-6',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
+  more: 'M5 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2zM12 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2zM19 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z',
 };
 
 export type IconName = keyof typeof PATHS;

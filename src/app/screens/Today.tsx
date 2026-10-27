@@ -1,6 +1,9 @@
+import { useMemo, useState } from 'react';
 import { fmtDayLong, mondayOf, weekday } from '../../engine/dates';
 import { today as todayList, upcoming, waitingByPerson, type TodayEntry } from '../../engine/decide';
 import { reviewDue, weekSummary } from '../../engine/review';
+import type { Item } from '../../engine/types';
+import { routineGrid, weekOf, weekPlan } from '../../engine/week';
 import { Icon } from '../components/icons';
 import { ItemRow, useListKeys } from '../components/ItemRow';
 import { Avatar, Empty, Hero, Kbd, Section, Stat } from '../components/ui';
@@ -18,6 +21,7 @@ export function Today() {
   const { sel, setSel } = useListKeys(flat);
   const waiting = doc.items.filter((i) => i.status === 'open' && i.direction === 'wait').length;
   const empty = doc.items.length === 0;
+  const done = useMemo(() => doneOn(doc.items, state.today), [doc.items, state.today]);
 
   // Chases grouped by person, so three items for Sam become one email.
   const byPerson = new Map<string, TodayEntry[]>();
@@ -44,6 +48,7 @@ export function Today() {
             <Stat label="To chase" value={t.chase.length} tone={t.chase.length ? 'amber' : 'muted'} />
             <Stat label="At risk" value={t.risk.length} tone={t.risk.length ? 'red' : 'muted'} />
             <Stat label="Waiting on others" value={waiting} tone="blue" />
+            {done.length > 0 && <Stat label="Done today" value={done.length} tone="good" />}
           </>
         }
       />
@@ -89,10 +94,11 @@ export function Today() {
               {flat.length === 0 && (
                 <div className="list-card">
                   <Empty title="Nothing needs you today." icon="check">
-                    Everything you owe is in hand and nobody is due a chase. <a href={href('wait')}>See what you are waiting on</a>.
+                    Everything you owe is in hand and nobody is due a chase. <a href={href('week')}>See the rest of the week</a>.
                   </Empty>
                 </div>
               )}
+              {done.length > 0 && <DoneToday items={done} />}
               <p className="hint mt-6">
                 Press <Kbd>?</Kbd> for the keyboard: <b>J</b>/<b>K</b> move, <b>Enter</b> opens, <b>C</b> chases, <b>D</b> marks done.
               </p>
@@ -115,8 +121,54 @@ function TodayRail() {
   const week = weekSummary(ctx);
   const closed = week.done.length + week.received.length;
   const lastDone = doc.settings.review.lastDone;
+  const monday = weekOf(state.today);
+  const plan = useMemo(() => weekPlan(ctx, monday), [ctx, monday]);
+  const cells = useMemo(() => routineGrid(ctx, monday).flatMap((r) => r.cells), [ctx, monday]);
+  const routinesDone = cells.filter((c) => c.state === 'done' || c.state === 'late').length;
+  const routinesAll = cells.filter((c) => c.state !== 'skipped' && c.state !== 'dropped').length;
   return (
     <aside className="today-rail" aria-label="This week">
+      <div className="rail-card" data-testid="rail-week">
+        <div className="rail-h">
+          <span className="eyebrow">This week</span>
+          <a className="rail-link" href={href('week')}>
+            Plan the week
+          </a>
+        </div>
+        <div className="rail-week">
+          {plan.days.map((d) => {
+            const todo = d.entries.filter((e) => e.kind !== 'closed').length;
+            const got = d.entries.length - todo;
+            return (
+              <a
+                key={d.day}
+                href={href('week')}
+                className={`rail-wday${d.day === state.today ? ' is-today' : ''}${d.day < state.today ? ' is-past' : ''}${d.working ? '' : ' is-off'}`}
+                title={`${fmt.day(d.day)}: ${todo} to do${got ? `, ${got} done` : ''}${d.holiday ? ' (holiday)' : ''}`}
+              >
+                <span>{WD[weekday(d.day)].slice(0, 3)}</span>
+                <b>{todo || '–'}</b>
+              </a>
+            );
+          })}
+        </div>
+        {routinesAll > 0 && (
+          <a className="rail-routines" href={href('recurring')}>
+            <span className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="repeat" size={13} /> Recurring
+              </span>
+              <span className="mono">
+                {routinesDone} of {routinesAll} done
+              </span>
+            </span>
+            <span className="progress mt-1.5" aria-hidden="true">
+              <span style={{ width: `${(routinesDone / routinesAll) * 100}%` }} />
+            </span>
+          </a>
+        )}
+      </div>
+
       <div className="rail-card">
         <div className="rail-h">
           <span className="eyebrow">Next five working days</span>
@@ -221,9 +273,13 @@ function FirstRun() {
           <span className="mono">@Jordan cable schedule since monday</span>: you asked on Monday, so the wait counts from then.
         </li>
         <li>
-          <span className="mono">owe: timesheet every friday</span>: comes back every week once done.
+          <span className="mono">owe: timesheet every friday</span>: comes back every week once done. So does{' '}
+          <span className="mono">every month end</span>, <span className="mono">every mon and thu</span> or <span className="mono">the first monday of every month</span>.
         </li>
       </ul>
+      <p className="mt-3 text-[13px]">
+        Everything that repeats is listed in <a href={href('recurring')}>Recurring</a>, with how each has gone, and <a href={href('week')}>Week</a> lays out the days ahead.
+      </p>
       <p className="mt-4 text-[13px]">
         Or paste an email into <a href={href('capture')}>Capture</a> and let it find the actions, or add your contacts in one go from an email's To line under{' '}
         <a href={href('people')}>People</a>.
@@ -234,5 +290,36 @@ function FirstRun() {
         </p>
       )}
     </div>
+  );
+}
+
+/** What was closed on a day, the most recent first. */
+function doneOn(items: Item[], day: string): Item[] {
+  const when = (it: Item) => [...it.history].reverse().find((h) => h.kind === 'done' || h.kind === 'received')?.at ?? '';
+  return items.filter((i) => i.status === 'done' && i.closedOn === day).sort((a, b) => when(b).localeCompare(when(a)));
+}
+
+/** Today's progress: what got done, each one a click from being reopened. */
+function DoneToday({ items }: { items: Item[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, 5);
+  return (
+    <Section
+      title="Done today"
+      count={items.length}
+      aside={
+        items.length > 5 ? (
+          <button type="button" className="link text-[12px]" onClick={() => setAll((a) => !a)}>
+            {all ? 'Show fewer' : `Show all ${items.length}`}
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="list-card rows" data-testid="done-today">
+        {shown.map((it) => (
+          <ItemRow key={it.id} item={it} />
+        ))}
+      </div>
+    </Section>
   );
 }

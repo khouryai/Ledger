@@ -12,11 +12,14 @@
  *   #tag                           a tag
  *   by fri / due 11/14 / fri       the due date (for a waiting item, their promise)
  *   since mon / asked 10/12        when the request was made, if not today
- *   every week / every 2 weeks / every month / every day
+ *   every friday / every mon and thu / every other tue / every working day
+ *   every month on the 15th / every month end / the first monday of every month
+ *     … until 12/18 / … starting 11/2   when a schedule ends, or starts
  *   owe: … / wait: …               direction, as an alternative to the Tab toggle
  */
-import { addDays, addMonths, findDate, weekdayFromWord, type Calendar } from './dates';
+import { addDays, addMonths, findDate, makeDay, mondayOf, weekdayFromWord, type Calendar, type DateMatch } from './dates';
 import { matchPerson, nameFromHandle, type PersonMatch } from './people';
+import { findRecurrence, firstOccurrence, fullRule } from './recur';
 import type { DateOrder, Day, Direction, Person, Recurrence } from './types';
 
 export type QuickToken =
@@ -50,6 +53,16 @@ function cut(text: string, index: number, length: number): string {
   return `${text.slice(0, index)} ${text.slice(index + length)}`;
 }
 
+/** Where a schedule starts: "starting next week" is that week's Monday, not its Friday. */
+function startOf(d: DateMatch, today: Day): Day {
+  if (/^next week$/i.test(d.text)) return mondayOf(addDays(today, 7));
+  if (/^next month$/i.test(d.text)) {
+    const [y, m] = addMonths(today, 1).split('-').map(Number);
+    return makeDay(y, m, 1)!;
+  }
+  return d.day;
+}
+
 /** Tidy what is left once the recognised parts are taken out. */
 export function tidyTitle(raw: string): string {
   let t = raw.replace(/\s+/g, ' ').trim();
@@ -76,22 +89,26 @@ export function parseQuickAdd(input: string, ctx: QuickContext): QuickAdd {
     text = text.slice(dir[0].length - 1);
   }
 
-  // Recurrence first: "every friday" must not leave "friday" behind as a due date.
+  // The schedule first: "every friday" must not leave "friday" behind as a due date.
   let recur: Recurrence | undefined;
-  let recurDay: number | null = null;
-  const rec = /\s(every|each)\s+(?:(\d{1,2}|other)\s+)?(working day|workday|weekday|day|week|month|(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)[a-z]*)s?\b/i.exec(text);
+  let start: Day | undefined;
+  let recurToken = -1;
+  const rec = findRecurrence(text);
   if (rec) {
-    const n = rec[2] ? (rec[2].toLowerCase() === 'other' ? 2 : Number(rec[2])) : 1;
-    const unitWord = rec[3].toLowerCase();
-    const wd = weekdayFromWord(unitWord);
-    if (wd !== null) {
-      recur = { every: n, unit: 'week' };
-      recurDay = wd;
-    } else if (unitWord.startsWith('month')) recur = { every: n, unit: 'month' };
-    else if (unitWord.startsWith('week') && unitWord !== 'weekday') recur = { every: n, unit: 'week' };
-    else recur = { every: n, unit: 'day' };
-    tokens.push({ kind: 'recur', text: rec[0].trim(), recur });
-    text = cut(text, rec.index, rec[0].length);
+    recur = rec.recur;
+    let len = rec.text.length;
+    // "until 12/18" or "starting 11/2", straight after it.
+    for (;;) {
+      const rest = text.slice(rec.index + len);
+      const m = /^\s*,?\s*(until|till|ending|starting|from|beginning)\s+/i.exec(rest);
+      const d = m ? findDate(rest.slice(m[0].length), ctx.today, ctx.cal, ctx.order) : null;
+      if (!m || !d || d.index !== 0) break;
+      if (/^(until|till|ending)$/i.test(m[1])) recur = { ...recur, until: d.day };
+      else start = startOf(d, ctx.today);
+      len += m[0].length + d.text.length;
+    }
+    recurToken = tokens.push({ kind: 'recur', text: text.slice(rec.index, rec.index + len).trim(), recur }) - 1;
+    text = cut(text, rec.index, len);
   }
 
   // People: @Sam, @"Sam Lee", @sam_lee
@@ -150,10 +167,13 @@ export function parseQuickAdd(input: string, ctx: QuickContext): QuickAdd {
     tokens.push({ kind: 'due', text: text.slice(start, start + len).trim(), day: due });
     text = cut(text, start, len);
   }
-  // "every friday" with no date of its own is due on the next Friday.
-  if (!due && recurDay !== null) {
-    const m = findDate(['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][recurDay], ctx.today, ctx.cal, ctx.order);
-    if (m) due = m.day;
+  // A schedule is held whole from here on, its days taken from the first one: "every
+  // week" said on a Thursday is every Thursday. With no date of its own, the first
+  // one is the schedule's first day from today (or from when it starts).
+  if (recur) {
+    recur = fullRule(recur, due ?? start ?? ctx.today);
+    due ??= firstOccurrence(recur, start ?? ctx.today, ctx.cal) ?? undefined;
+    tokens[recurToken] = { ...tokens[recurToken], recur } as QuickToken;
   }
 
   return {

@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { calendarOf, addItem, addPerson } from '../../engine/ops';
 import { parseQuickAdd, type QuickAdd as Parsed } from '../../engine/quickadd';
+import { describeRecurrence } from '../../engine/recur';
 import type { Direction, Item, LedgerDoc, Person, Source } from '../../engine/types';
 import { makeFmt } from '../format';
 import { useApp } from '../state';
@@ -168,7 +169,7 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
               <b>since mon</b> asked
             </span>
             <span>
-              <b>every week</b> repeats
+              <b>every fri</b>, <b>every month end</b> repeats
             </span>
             <span>
               <b>Tab</b> I owe / Waiting on
@@ -226,10 +227,8 @@ export function QuickAdd({ id = 'main', source, offer, placeholder, onAdded, aut
                 </span>
               )}
               {parsed.recur && (
-                <span className="chip">
-                  <Icon name="repeat" size={12} /> every {parsed.recur.every > 1 ? `${parsed.recur.every} ` : ''}
-                  {parsed.recur.unit === 'day' ? 'working day' : parsed.recur.unit}
-                  {parsed.recur.every > 1 ? 's' : ''}
+                <span className="chip" data-testid="qa-recur">
+                  <Icon name="repeat" size={12} /> {describeRecurrence(parsed.recur, { order: doc.settings.dateOrder, today: state.today })}
                 </span>
               )}
               {parsed.tags.map((t) => (

@@ -5,17 +5,29 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAiStatus } from '../../ai/manager';
-import { age, chasePlan, suggestions } from '../../engine/decide';
-import { calendarOf, drop, markReviewed, updateSettings } from '../../engine/ops';
+import { age, chasePlan, suggestions, type Suggestion } from '../../engine/decide';
+import { calendarOf, drop, markReviewed, updateItem, updateSettings } from '../../engine/ops';
 import { reviewQueue, weekSummary, weekSummaryText, weekdayName } from '../../engine/review';
 import type { Item } from '../../engine/types';
+import { weekOf } from '../../engine/week';
 import { useAi } from '../ai';
 import { Icon } from '../components/icons';
 import { historyWord } from '../components/ItemDrawer';
 import { ItemRow, snoozeChoices, useItemActions } from '../components/ItemRow';
 import { Badge, copyRich, Empty, Hero, Kbd, Section } from '../components/ui';
 import { fmtWhen, makeFmt } from '../format';
-import { useApp } from '../state';
+import { href } from '../router';
+import { dialogOpen, useApp } from '../state';
+
+/** The way on from a review: next week, laid out a day at a time. */
+function PlanNextWeek({ primary }: { primary?: boolean }) {
+  const { state } = useApp();
+  return (
+    <a className={`btn${primary ? ' btn-primary' : ''}`} href={href('week', { w: weekOf(state.today, 1) })} data-testid="plan-next-week">
+      <Icon name="week" size={14} /> Plan next week
+    </a>
+  );
+}
 
 export function Review() {
   const [tab, setTab] = useState<'walk' | 'suggest' | 'week'>('walk');
@@ -47,7 +59,7 @@ export function Review() {
 }
 
 function Walk() {
-  const { state, ctx, actions } = useApp();
+  const { state, ctx, ui, actions } = useApp();
   const queue = useMemo(() => reviewQueue(ctx), [ctx]);
   // The list is fixed when the review starts, so acting on an item does not reshuffle it.
   const [ids] = useState(() => queue.map((i) => i.id));
@@ -69,7 +81,7 @@ function Walk() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!cur || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!cur || dialogOpen(ui) || e.ctrlKey || e.metaKey || e.altKey) return;
       if ((e.target as HTMLElement).closest('input, textarea, select')) return;
       const k = e.key.toLowerCase();
       if (k === 'k') keep();
@@ -95,21 +107,23 @@ function Walk() {
     return (
       <div className="card">
         <Empty title="Nothing has gone quiet.">Every open item has been touched in the last {s.review.staleAfter} working days.</Empty>
-        <div className="text-center">
+        <div className="flex flex-wrap justify-center gap-2">
           <button type="button" className="btn btn-primary" onClick={finish}>
             Mark this week's review done
           </button>
+          <PlanNextWeek />
         </div>
       </div>
     );
   if (!cur)
     return (
       <div className="card">
-        <Empty title={`All ${items.length} looked at.`}>Have a look at the suggestions and the week, then mark it done.</Empty>
-        <div className="text-center">
+        <Empty title={`All ${items.length} looked at.`}>Have a look at the suggestions and the week, then mark it done and lay out the next one.</Empty>
+        <div className="flex flex-wrap justify-center gap-2">
           <button type="button" className="btn btn-primary" onClick={finish} data-testid="review-finish">
             Mark this week's review done
           </button>
+          <PlanNextWeek />
         </div>
       </div>
     );
@@ -179,7 +193,8 @@ function Suggest() {
   const list = suggestions(ctx);
   const byKind = (k: string) => list.filter((s) => s.kind === k);
   const item = (id: string) => state.doc.items.find((i) => i.id === id)!;
-  const block = (title: string, kind: 'escalate' | 'dead' | 'risk', act: (it: Item) => ReactNode) => {
+  const a = useItemActions();
+  const block = (title: string, kind: Suggestion['kind'], act: (it: Item) => ReactNode) => {
     const xs = byKind(kind);
     if (!xs.length) return null;
     return (
@@ -195,7 +210,12 @@ function Suggest() {
       </Section>
     );
   };
-  if (!list.length) return <div className="card"><Empty title="Nothing to suggest.">No item has been chased into silence, gone dead, or put something you owe at risk.</Empty></div>;
+  if (!list.length)
+    return (
+      <div className="card">
+        <Empty title="Nothing to suggest.">No item has been chased into silence, gone dead or put something you owe at risk, and every recurring item keeps to its schedule.</Empty>
+      </div>
+    );
   return (
     <div>
       {block('Escalate', 'escalate', (it) => (
@@ -218,8 +238,27 @@ function Suggest() {
           Open it
         </button>
       ))}
+      {block('Recurring, and usually late', 'slipping', (it) => (
+        <button type="button" className="btn btn-mini btn-primary" onClick={() => a.schedule(it)}>
+          Change the schedule
+        </button>
+      ))}
+      {block('Recurring, and usually skipped', 'unneeded', (it) => (
+        <>
+          <button
+            type="button"
+            className="btn btn-mini"
+            onClick={() => actions.apply((d) => updateItem(d, it.id, { recur: undefined }, new Date()), `#${it.num} no longer repeats. It stays on your list as a one-off.`)}
+          >
+            Stop repeating
+          </button>
+          <button type="button" className="btn btn-mini" onClick={() => a.pause(it)}>
+            Pause until…
+          </button>
+        </>
+      ))}
       <p className="hint mt-4">
-        <Badge tone="muted">How</Badge> These come from your own history: chases with no movement, silence well past what this person usually takes, and inputs likely to land after your deadline.
+        <Badge tone="muted">How</Badge> These come from your own history: chases with no movement, silence well past what this person usually takes, inputs likely to land after your deadline, and recurring items whose last few were mostly late or skipped.
       </p>
     </div>
   );
@@ -243,6 +282,7 @@ function Week() {
           <button type="button" className="btn" onClick={() => void copyRich(text).then((ok) => actions.toast(ok ? 'Copied.' : 'Could not reach the clipboard.', ok ? 'info' : 'error'))}>
             <Icon name="copy" size={14} /> Copy
           </button>
+          <PlanNextWeek />
           {ai.on && (
             <button
               type="button"

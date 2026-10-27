@@ -31,11 +31,31 @@ export type Source = {
   messageId?: string;
 };
 
+/**
+ * A schedule: what engine/recur.ts reads to put the next occurrence on the list. A
+ * part left out is taken from the due date it was set from, so an old file's
+ * `{ every: 1, unit: 'week' }` still means "every week, on the day it was due".
+ */
 export type Recurrence = {
   every: number;
   /** `day` counts working days. */
   unit: 'day' | 'week' | 'month';
+  /** For `week`: the weekdays it falls on, 0 = Sunday … 6 = Saturday. For `month` with `nth`: the weekday. */
+  days?: number[];
+  /** For `month`: the day of the month, 1 to 31 (the month's last in a shorter one), or -1 for the last working day. */
+  monthDay?: number;
+  /** For `month`, instead of a day: the first to fourth (1 to 4) or the last (-1) of `days` in the month. */
+  nth?: number;
+  /** The day the schedule counts from: it settles which weeks "every other week" falls in. */
+  from?: Day;
+  /** Nothing is due after this day. */
+  until?: Day;
+  /** Each occurrence is owed even when one is late. Absent: the next one is the first due from the day it is closed. */
+  catchUp?: boolean;
 };
+
+/** One step of a checklist on an item. A recurring item's steps come back unticked. */
+export type Step = { id: string; text: string; done: boolean };
 
 export type ChaseLevel = 'nudge' | 'firm' | 'escalate';
 
@@ -52,7 +72,9 @@ export type HistoryKind =
   | 'dropped'
   | 'reopened'
   | 'linked'
-  | 'unlinked';
+  | 'unlinked'
+  | 'skipped'
+  | 'step';
 
 /** Who made a change: you, or a rule or the model you accepted a suggestion from. */
 export type Actor = 'you' | 'rule' | 'ai' | 'outlook' | 'learned';
@@ -97,6 +119,10 @@ export type Item = {
   /** Waiting-on items this one cannot finish without. */
   blockedBy: string[];
   recur?: Recurrence;
+  /** The recurring series this occurrence belongs to: the id of its first occurrence. */
+  seriesId?: string;
+  /** A checklist. Absent when it has none. */
+  steps?: Step[];
   notes?: string;
   history: HistoryEvent[];
   createdAt: string;
